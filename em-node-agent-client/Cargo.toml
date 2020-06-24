@@ -4,6 +4,7 @@ version = "1.0.0"
 authors = ["Fortanix Inc."]
 license = "MPL-2.0"
 description = "This crate provides rust bindings for Node Agent API."
+repository = "https://github.com/fortanix/em-client-rust"
 
 [features]
 default = ["client"]

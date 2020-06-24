@@ -7,6 +7,7 @@ authors = ["fortanix.com"]
 license = "MPL-2.0"
 edition = "2018"
 description = "This crate provides a cli for Enclave Manager."
+repository = "https://github.com/fortanix/em-client-rust"
 
 [dependencies]
 clap = "2.2.5"                                   # MIT
