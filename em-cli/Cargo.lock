@@ -185,6 +185,8 @@ dependencies = [
 [[package]]
 name = "em-client"
 version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e750e34bad02ad22da972ff404a2a4b6d2298db901f03dd48b557b5a0b9c1286"
 dependencies = [
  "base64 0.10.1",
  "chrono",
