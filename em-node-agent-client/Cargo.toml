@@ -1,0 +1,29 @@
+[package]
+name = "em-node-agent-client"
+version = "1.0.0"
+authors = ["Fortanix Inc."]
+license = "MPL-2.0"
+description = "This crate provides rust bindings for Node Agent API."
+
+[features]
+default = ["client"]
+client = ["serde_ignored", "hyper", "url"]
+
+[dependencies]
+base64 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.1"
+lazy_static = "1.0"
+log = "0.3.0"
+mime = "0.2.6"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+uuid = {version = "0.6", features = ["serde", "v4"]}
+hyper = {version = "0.10", default-features = false, optional = true}
+serde_ignored = {version = "0.0.4", optional = true}
+url = {version = "1.5", optional = true}
+
+[dev-dependencies]
+clap = "2.25"
+error-chain = "0.12"

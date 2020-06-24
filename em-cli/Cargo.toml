@@ -1,0 +1,24 @@
+[workspace]
+
+[package]
+name = "em-cli"
+version = "0.1.0"
+authors = ["fortanix.com"]
+license = "MPL-2.0"
+edition = "2018"
+description = "This crate provides a cli for Enclave Manager."
+
+[dependencies]
+clap = "2.2.5"                                   # MIT
+crypto-hash = "0.3"                              # MIT
+lazy_static = "1"
+serde_bytes = "0.10"
+hyper-native-tls = "0.2"
+serde_json = "1.0"
+native-tls = "0.1.5"
+sgx-isa = { version = "0.3" }
+hyper = { version = "0.10", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "0.6.3", features = ["serde"] }
+em-client = { path = "../em-client/", default-features = false, features = ["client"] }
+b64-ct = "0.1.1"

@@ -1,0 +1,6 @@
+manager_url="https://em.fortanix.com"
+username="user@example.com"
+password="password"
+account_name="testaccount"
+app_name="testapp"
+domain="name"
