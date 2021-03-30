@@ -3,22 +3,23 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
 #![allow(unused_imports, unused_qualifications, unused_extern_crates)]
 extern crate chrono;
 
 use serde::ser::Serializer;
 
+use std::collections::BTreeMap as SortedHashMap;
+use std::collections::BTreeSet as SortedVec;
 use std::collections::HashMap;
 use models;
 use std::string::ParseError;
 use uuid;
 
 
-
-
-
-
+/// Roles of a user.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -60,7 +61,8 @@ impl ::std::str::FromStr for AccessRoles {
 pub struct Account {
     /// Name of the account. Account names must be unique within an EM instance.
     #[serde(rename = "name")]
-    pub name: String,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub name: Option<String>,
 
     /// Account ID uniquely identifying this account.
     #[serde(rename = "acct_id")]
@@ -68,31 +70,89 @@ pub struct Account {
 
     /// When this account was created.
     #[serde(rename = "created_at")]
-    pub created_at: i64,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub created_at: Option<i64>,
 
-    /// role of the current user in particular account
+    /// Role of the current user in a particular account.
     #[serde(rename = "roles")]
-    pub roles: Vec<models::AccessRoles>,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub roles: Option<Vec<models::AccessRoles>>,
 
-    /// logo of the particular account. Max size 128Kb, .jpg, .png, .svg file formats only
+    /// logo of the particular account. Max size 128Kb, .jpg, .png, .svg file formats only.
     #[serde(rename = "custom_logo")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub custom_logo: Option<crate::ByteArray>,
 
     #[serde(rename = "status")]
-    pub status: models::UserAccountStatus,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub status: Option<models::UserAccountStatus>,
+
+    #[serde(rename = "features")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub features: Option<Vec<String>>,
+
+    #[serde(rename = "auth_configs")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub auth_configs: Option<HashMap<String, models::AuthenticationConfig>>,
+
+    #[serde(rename = "approval_state")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub approval_state: Option<models::AccountApprovalState>,
 
 }
 
 impl Account {
-    pub fn new(name: String, acct_id: uuid::Uuid, created_at: i64, roles: Vec<models::AccessRoles>, status: models::UserAccountStatus, ) -> Account {
+    pub fn new(acct_id: uuid::Uuid, ) -> Account {
         Account {
-            name: name,
+            name: None,
             acct_id: acct_id,
-            created_at: created_at,
-            roles: roles,
+            created_at: None,
+            roles: None,
             custom_logo: None,
-            status: status,
+            status: None,
+            features: None,
+            auth_configs: None,
+            approval_state: None,
+        }
+    }
+}
+
+
+/// Approval state of an Account
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
+#[allow(non_camel_case_types)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
+pub enum AccountApprovalState { 
+    #[serde(rename = "PENDING_CONFIRMATION")]
+    PENDING_CONFIRMATION,
+    #[serde(rename = "APPROVED")]
+    APPROVED,
+    #[serde(rename = "DISAPPROVED")]
+    DISAPPROVED,
+}
+
+impl ::std::fmt::Display for AccountApprovalState {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self { 
+            AccountApprovalState::PENDING_CONFIRMATION => write!(f, "{}", "PENDING_CONFIRMATION"),
+            AccountApprovalState::APPROVED => write!(f, "{}", "APPROVED"),
+            AccountApprovalState::DISAPPROVED => write!(f, "{}", "DISAPPROVED"),
+        }
+    }
+}
+
+impl ::std::str::FromStr for AccountApprovalState {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "PENDING_CONFIRMATION" => Ok(AccountApprovalState::PENDING_CONFIRMATION),
+            "APPROVED" => Ok(AccountApprovalState::APPROVED),
+            "DISAPPROVED" => Ok(AccountApprovalState::DISAPPROVED),
+            _ => Err(()),
         }
     }
 }
@@ -123,10 +183,14 @@ pub struct AccountRequest {
     #[serde(rename = "name")]
     pub name: String,
 
-    /// logo for an account. Max size 128Kb, .jpg, .png, .svg file formats only
+    /// logo for an account. Max size 128Kb, .jpg, .png, .svg file formats only.
     #[serde(rename = "custom_logo")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub custom_logo: Option<crate::ByteArray>,
+
+    #[serde(rename = "auth_configs")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub auth_configs: Option<Vec<models::AuthenticationConfig>>,
 
 }
 
@@ -135,6 +199,7 @@ impl AccountRequest {
         AccountRequest {
             name: name,
             custom_logo: None,
+            auth_configs: None,
         }
     }
 }
@@ -151,6 +216,22 @@ pub struct AccountUpdateRequest {
     #[serde(skip_serializing_if="Option::is_none")]
     pub custom_logo: Option<crate::ByteArray>,
 
+    #[serde(rename = "features")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub features: Option<Vec<String>>,
+
+    #[serde(rename = "add_auth_configs")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub add_auth_configs: Option<Vec<models::AuthenticationConfig>>,
+
+    #[serde(rename = "mod_auth_configs")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub mod_auth_configs: Option<HashMap<String, models::AuthenticationConfig>>,
+
+    #[serde(rename = "del_auth_configs")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub del_auth_configs: Option<Vec<uuid::Uuid>>,
+
 }
 
 impl AccountUpdateRequest {
@@ -158,6 +239,10 @@ impl AccountUpdateRequest {
         AccountUpdateRequest {
             name: None,
             custom_logo: None,
+            features: None,
+            add_auth_configs: None,
+            mod_auth_configs: None,
+            del_auth_configs: None,
         }
     }
 }
@@ -166,12 +251,12 @@ impl AccountUpdateRequest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AddZoneRequest {
-    /// Name for the new zone
+    /// Name of the new zone.
     #[serde(rename = "name")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub name: Option<String>,
 
-    /// Description of the new zone
+    /// Description of the new zone.
     #[serde(rename = "description")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub description: Option<String>,
@@ -188,16 +273,16 @@ impl AddZoneRequest {
 }
 
 
-
+/// Advanced settings for apps and images.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AdvancedSettings {
-    /// Entrypoint for the container
+    /// Entrypoint for the container.
     #[serde(rename = "entrypoint")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub entrypoint: Option<Vec<String>>,
 
-    /// Filesystem directories to encrypt using enclave sealing key
+    /// Filesystem directories to encrypt using enclave sealing key.
     #[serde(rename = "encryptedDirs")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub encrypted_dirs: Option<Vec<String>>,
@@ -214,17 +299,17 @@ pub struct AdvancedSettings {
     #[serde(skip_serializing_if="Option::is_none")]
     pub java_runtime: Option<models::JavaRuntime>,
 
-    /// Filesystem directories to enable read write
+    /// Filesystem directories to enable read write.
     #[serde(rename = "rw_dirs")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub rw_dirs: Option<Vec<String>>,
 
-    /// allow command line arguments converter flag for an image
+    /// Allow command line arguments converter flag for an image.
     #[serde(rename = "allowCmdlineArgs")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub allow_cmdline_args: Option<bool>,
 
-    /// Environment variables that will be passed to the manifest file when the container is converted
+    /// Environment variables that will be passed to the manifest file when the container is converted.
     #[serde(rename = "manifestEnv")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub manifest_env: Option<Vec<String>>,
@@ -250,21 +335,21 @@ impl AdvancedSettings {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct App {
-    /// Timestamp of build addition to the system
+    /// Timestamp of image addition to the system.
     #[serde(rename = "created_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub created_at: Option<i64>,
 
-    /// Timestamp of build updation to the system
+    /// Timestamp of image updation to the system.
     #[serde(rename = "updated_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub updated_at: Option<i64>,
 
-    /// Name of the app
+    /// Name of the app.
     #[serde(rename = "name")]
     pub name: String,
 
-    /// Description of the app
+    /// Description of the app.
     #[serde(rename = "description")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub description: Option<String>,
@@ -273,11 +358,11 @@ pub struct App {
     #[serde(rename = "app_id")]
     pub app_id: uuid::Uuid,
 
-    /// Input image name of builds for apps
+    /// Input image name of images for apps.
     #[serde(rename = "input_image_name")]
     pub input_image_name: String,
 
-    /// Output image name of builds for apps
+    /// Output image name of images for apps.
     #[serde(rename = "output_image_name")]
     pub output_image_name: String,
 
@@ -289,11 +374,11 @@ pub struct App {
     #[serde(rename = "isvsvn")]
     pub isvsvn: i32,
 
-    /// Mem size required for the build
+    /// Mem size required for the image.
     #[serde(rename = "mem_size")]
     pub mem_size: i64,
 
-    /// Threads req for the build
+    /// Threads req for the image.
     #[serde(rename = "threads")]
     pub threads: i32,
 
@@ -313,10 +398,10 @@ pub struct App {
     #[serde(skip_serializing_if="Option::is_none")]
     pub advanced_settings: Option<models::AdvancedSettings>,
 
-    /// no of domain whitelist tasks pending for app
-    #[serde(rename = "pending_domain_whitelist_tasks")]
+    /// UUID of pending domain whitelist task for the app.
+    #[serde(rename = "pending_task_id")]
     #[serde(skip_serializing_if="Option::is_none")]
-    pub pending_domain_whitelist_tasks: Option<i32>,
+    pub pending_task_id: Option<uuid::Uuid>,
 
     #[serde(rename = "domains_added")]
     #[serde(skip_serializing_if="Option::is_none")]
@@ -325,6 +410,10 @@ pub struct App {
     #[serde(rename = "domains_removed")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub domains_removed: Option<Vec<String>>,
+
+    #[serde(rename = "labels")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub labels: Option<HashMap<String, String>>,
 
 }
 
@@ -346,29 +435,30 @@ impl App {
             whitelisted_domains: None,
             nodes: None,
             advanced_settings: None,
-            pending_domain_whitelist_tasks: None,
+            pending_task_id: None,
             domains_added: None,
             domains_removed: None,
+            labels: None,
         }
     }
 }
 
 
-
+/// Request to update an app.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AppBodyUpdateRequest {
-    /// Description of the app
+    /// Description of the app.
     #[serde(rename = "description")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub description: Option<String>,
 
-    /// Input image name of builds for apps
+    /// Input image name of images for apps.
     #[serde(rename = "input_image_name")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub input_image_name: Option<String>,
 
-    /// Output image name of builds for apps
+    /// Output image name of images for apps.
     #[serde(rename = "output_image_name")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub output_image_name: Option<String>,
@@ -378,12 +468,17 @@ pub struct AppBodyUpdateRequest {
     #[serde(skip_serializing_if="Option::is_none")]
     pub isvsvn: Option<i32>,
 
-    /// Mem size required for the build
+    /// ISVPRODID
+    #[serde(rename = "isvprodid")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub isvprodid: Option<i32>,
+
+    /// Mem size required for the image.
     #[serde(rename = "mem_size")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub mem_size: Option<i64>,
 
-    /// Threads req for the build
+    /// Threads required for the image.
     #[serde(rename = "threads")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub threads: Option<i32>,
@@ -396,6 +491,10 @@ pub struct AppBodyUpdateRequest {
     #[serde(skip_serializing_if="Option::is_none")]
     pub advanced_settings: Option<models::AdvancedSettings>,
 
+    #[serde(rename = "labels")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub labels: Option<Vec<models::PatchDocument>>,
+
 }
 
 impl AppBodyUpdateRequest {
@@ -405,56 +504,33 @@ impl AppBodyUpdateRequest {
             input_image_name: None,
             output_image_name: None,
             isvsvn: None,
+            isvprodid: None,
             mem_size: None,
             threads: None,
             allowed_domains: None,
             advanced_settings: None,
+            labels: None,
         }
     }
 }
 
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct AppHeartbeatRequest {
-    /// App heartbeat csr
-    #[serde(rename = "csr")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub csr: Option<String>,
-
-    /// Node Id for the requesting host agent
-    #[serde(rename = "node_id")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub node_id: Option<uuid::Uuid>,
-
-}
-
-impl AppHeartbeatRequest {
-    pub fn new() -> AppHeartbeatRequest {
-        AppHeartbeatRequest {
-            csr: None,
-            node_id: None,
-        }
-    }
-}
-
-
-
+/// Detailed info of an app running on a compute node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AppNodeInfo {
     #[serde(rename = "certificate")]
     pub certificate: models::Certificate,
 
-    /// App node creation time
+    /// App compute node creation time.
     #[serde(rename = "created_at")]
     pub created_at: i64,
 
-    /// Node Id
+    /// Compute Node Id
     #[serde(rename = "node_id")]
     pub node_id: uuid::Uuid,
 
-    /// Node name
+    /// Compute Node Name.
     #[serde(rename = "node_name")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub node_name: Option<String>,
@@ -467,17 +543,17 @@ pub struct AppNodeInfo {
     #[serde(skip_serializing_if="Option::is_none")]
     pub build_info: Option<models::Build>,
 
-    /// App heartbeat message count
+    /// App heartbeat message count.
     #[serde(rename = "message_count")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub message_count: Option<i32>,
 
-    /// Key Id for app heartbeat
+    /// Key Id for app heartbeat.
     #[serde(rename = "key_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub key_id: Option<String>,
 
-    /// App running in debug mode or not
+    /// App running in debug mode or not.
     #[serde(rename = "is_debug")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub is_debug: Option<bool>,
@@ -501,24 +577,47 @@ impl AppNodeInfo {
 }
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AppRegistryResponse {
+    #[serde(rename = "input_image_registry")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub input_image_registry: Option<models::Registry>,
 
+    #[serde(rename = "output_image_registry")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub output_image_registry: Option<models::Registry>,
+
+}
+
+impl AppRegistryResponse {
+    pub fn new() -> AppRegistryResponse {
+        AppRegistryResponse {
+            input_image_registry: None,
+            output_image_registry: None,
+        }
+    }
+}
+
+
+/// Request to create an app.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AppRequest {
-    /// Name of the app
+    /// Name of the app.
     #[serde(rename = "name")]
     pub name: String,
 
-    /// Description of the app
+    /// Description of the app.
     #[serde(rename = "description")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub description: Option<String>,
 
-    /// Input image name of builds for apps
+    /// Input image name of images for apps.
     #[serde(rename = "input_image_name")]
     pub input_image_name: String,
 
-    /// Output image name of builds for apps
+    /// Output image name of images for apps.
     #[serde(rename = "output_image_name")]
     pub output_image_name: String,
 
@@ -530,11 +629,11 @@ pub struct AppRequest {
     #[serde(rename = "isvsvn")]
     pub isvsvn: i32,
 
-    /// Mem size required for the build
+    /// Mem size required for the image.
     #[serde(rename = "mem_size")]
     pub mem_size: i64,
 
-    /// Threads req for the build
+    /// Threads req for the image.
     #[serde(rename = "threads")]
     pub threads: i32,
 
@@ -545,6 +644,10 @@ pub struct AppRequest {
     #[serde(rename = "advanced_settings")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub advanced_settings: Option<models::AdvancedSettings>,
+
+    #[serde(rename = "labels")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub labels: Option<HashMap<String, String>>,
 
 }
 
@@ -561,12 +664,13 @@ impl AppRequest {
             threads: threads,
             allowed_domains: None,
             advanced_settings: None,
+            labels: None,
         }
     }
 }
 
 
-
+/// Run status info of an app for a compute node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AppStatus {
@@ -574,12 +678,12 @@ pub struct AppStatus {
     #[serde(skip_serializing_if="Option::is_none")]
     pub status: Option<models::AppStatusType>,
 
-    /// Time since the status change
+    /// Time since the status change.
     #[serde(rename = "status_updated_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub status_updated_at: Option<i64>,
 
-    /// The app attestation date
+    /// The app attestation date.
     #[serde(rename = "attested_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub attested_at: Option<i64>,
@@ -597,10 +701,10 @@ impl AppStatus {
 }
 
 
-
-
-
-
+/// Status string for the app on a compute node.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -637,7 +741,7 @@ impl ::std::str::FromStr for AppStatusType {
 }
 
 
-
+/// Request to update an app.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AppUpdateRequest {
@@ -650,6 +754,334 @@ impl AppUpdateRequest {
     pub fn new(status: models::AppStatusType, ) -> AppUpdateRequest {
         AppUpdateRequest {
             status: status,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfig {
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "app_config")]
+    pub app_config: SortedHashMap<String, models::ApplicationConfigContents>,
+
+    #[serde(rename = "labels")]
+    pub labels: SortedHashMap<String, String>,
+
+    #[serde(rename = "ports")]
+    pub ports: SortedVec<String>,
+
+    #[serde(rename = "zone")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub zone: Option<models::VersionedZoneId>,
+
+}
+
+impl ApplicationConfig {
+    pub fn new(name: String, description: String, app_config: SortedHashMap<String, models::ApplicationConfigContents>, labels: SortedHashMap<String, String>, ports: SortedVec<String>, ) -> ApplicationConfig {
+        ApplicationConfig {
+            name: name,
+            description: description,
+            app_config: app_config,
+            labels: labels,
+            ports: ports,
+            zone: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigConnection {
+    #[serde(rename = "dataset")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub dataset: Option<models::ApplicationConfigConnectionDataset>,
+
+    #[serde(rename = "application")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub application: Option<models::ApplicationConfigConnectionApplication>,
+
+}
+
+impl ApplicationConfigConnection {
+    pub fn new() -> ApplicationConfigConnection {
+        ApplicationConfigConnection {
+            dataset: None,
+            application: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigConnectionApplication {
+    #[serde(rename = "workflow_domain")]
+    pub workflow_domain: String,
+
+}
+
+impl ApplicationConfigConnectionApplication {
+    pub fn new(workflow_domain: String, ) -> ApplicationConfigConnectionApplication {
+        ApplicationConfigConnectionApplication {
+            workflow_domain: workflow_domain,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigConnectionDataset {
+    #[serde(rename = "location")]
+    pub location: String,
+
+    #[serde(rename = "credentials")]
+    pub credentials: models::ApplicationConfigDatasetCredentials,
+
+}
+
+impl ApplicationConfigConnectionDataset {
+    pub fn new(location: String, credentials: models::ApplicationConfigDatasetCredentials, ) -> ApplicationConfigConnectionDataset {
+        ApplicationConfigConnectionDataset {
+            location: location,
+            credentials: credentials,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigContents {
+    #[serde(rename = "contents")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub contents: Option<String>,
+
+}
+
+impl ApplicationConfigContents {
+    pub fn new() -> ApplicationConfigContents {
+        ApplicationConfigContents {
+            contents: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigDatasetCredentials {
+    #[serde(rename = "sdkms")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub sdkms: Option<models::ApplicationConfigSdkmsCredentials>,
+
+}
+
+impl ApplicationConfigDatasetCredentials {
+    pub fn new() -> ApplicationConfigDatasetCredentials {
+        ApplicationConfigDatasetCredentials {
+            sdkms: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigExtra {
+    #[serde(rename = "connections")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub connections: Option<SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigConnection>>>,
+
+}
+
+impl ApplicationConfigExtra {
+    pub fn new() -> ApplicationConfigExtra {
+        ApplicationConfigExtra {
+            connections: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigPort {
+    #[serde(rename = "dataset")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub dataset: Option<models::ApplicationConfigPortDataset>,
+
+    /// 
+    #[serde(rename = "application")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub application: Option<serde_json::Value>,
+
+}
+
+impl ApplicationConfigPort {
+    pub fn new() -> ApplicationConfigPort {
+        ApplicationConfigPort {
+            dataset: None,
+            application: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigPortDataset {
+    #[serde(rename = "id")]
+    pub id: uuid::Uuid,
+
+}
+
+impl ApplicationConfigPortDataset {
+    pub fn new(id: uuid::Uuid, ) -> ApplicationConfigPortDataset {
+        ApplicationConfigPortDataset {
+            id: id,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigResponse {
+    #[serde(rename = "config_id")]
+    pub config_id: String,
+
+    #[serde(rename = "created_at")]
+    pub created_at: i64,
+
+    #[serde(rename = "updated_at")]
+    pub updated_at: i64,
+
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "app_config")]
+    pub app_config: SortedHashMap<String, models::ApplicationConfigContents>,
+
+    #[serde(rename = "labels")]
+    pub labels: SortedHashMap<String, String>,
+
+    #[serde(rename = "ports")]
+    pub ports: SortedVec<String>,
+
+    #[serde(rename = "zone")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub zone: Option<models::VersionedZoneId>,
+
+}
+
+impl ApplicationConfigResponse {
+    pub fn new(config_id: String, created_at: i64, updated_at: i64, name: String, description: String, app_config: SortedHashMap<String, models::ApplicationConfigContents>, labels: SortedHashMap<String, String>, ports: SortedVec<String>, ) -> ApplicationConfigResponse {
+        ApplicationConfigResponse {
+            config_id: config_id,
+            created_at: created_at,
+            updated_at: updated_at,
+            name: name,
+            description: description,
+            app_config: app_config,
+            labels: labels,
+            ports: ports,
+            zone: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigSdkmsCredentials {
+    #[serde(rename = "credentials_url")]
+    pub credentials_url: String,
+
+    #[serde(rename = "credentials_key_name")]
+    pub credentials_key_name: String,
+
+    #[serde(rename = "sdkms_app_id")]
+    pub sdkms_app_id: uuid::Uuid,
+
+}
+
+impl ApplicationConfigSdkmsCredentials {
+    pub fn new(credentials_url: String, credentials_key_name: String, sdkms_app_id: uuid::Uuid, ) -> ApplicationConfigSdkmsCredentials {
+        ApplicationConfigSdkmsCredentials {
+            credentials_url: credentials_url,
+            credentials_key_name: credentials_key_name,
+            sdkms_app_id: sdkms_app_id,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApplicationConfigWorkflow {
+    #[serde(rename = "workflow_id")]
+    pub workflow_id: uuid::Uuid,
+
+    #[serde(rename = "app_name")]
+    pub app_name: String,
+
+    #[serde(rename = "port_map")]
+    pub port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>,
+
+}
+
+impl ApplicationConfigWorkflow {
+    pub fn new(workflow_id: uuid::Uuid, app_name: String, port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>, ) -> ApplicationConfigWorkflow {
+        ApplicationConfigWorkflow {
+            workflow_id: workflow_id,
+            app_name: app_name,
+            port_map: port_map,
+        }
+    }
+}
+
+
+/// Result of an approval request
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApprovableResult {
+    /// The HTTP status code for this partial request.
+    #[serde(rename = "status")]
+    pub status: isize,
+
+    #[serde(rename = "body")]
+    pub body: serde_json::Value,
+
+}
+
+impl ApprovableResult {
+    pub fn new(status: isize, body: serde_json::Value, ) -> ApprovableResult {
+        ApprovableResult {
+            status: status,
+            body: body,
         }
     }
 }
@@ -684,10 +1116,177 @@ impl ApprovalInfo {
 }
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApprovalRequest {
+    /// UUID uniquely identifying this approval request.
+    #[serde(rename = "request_id")]
+    pub request_id: uuid::Uuid,
+
+    #[serde(rename = "requester")]
+    pub requester: models::Entity,
+
+    /// When this approval request was created.
+    #[serde(rename = "created_at")]
+    pub created_at: i64,
+
+    /// The account ID of the account that this approval request belongs to.
+    #[serde(rename = "acct_id")]
+    pub acct_id: uuid::Uuid,
+
+    /// Operation URL path, e.g. `/crypto/v1/keys`, `/crypto/v1/groups/<id>`.
+    #[serde(rename = "operation")]
+    pub operation: String,
+
+    /// Method for the operation: POST, PATCH, PUT, DELETE, or GET. Default is POST.
+    #[serde(rename = "method")]
+    pub method: String,
+
+    #[serde(rename = "body")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub body: Option<serde_json::Value>,
+
+    #[serde(rename = "approvers")]
+    pub approvers: Vec<models::Entity>,
+
+    #[serde(rename = "denier")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub denier: Option<models::Entity>,
+
+    /// Reason given by denier.
+    #[serde(rename = "denial_reason")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub denial_reason: Option<String>,
+
+    #[serde(rename = "reviewers")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub reviewers: Option<Vec<models::Entity>>,
+
+    #[serde(rename = "status")]
+    pub status: models::ApprovalRequestStatus,
+
+    #[serde(rename = "subjects")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub subjects: Option<Vec<models::ApprovalSubject>>,
+
+    /// Optional comment about the approval request for the reviewer.
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+    /// When this approval request expires.
+    #[serde(rename = "expiry")]
+    pub expiry: i64,
+
+}
+
+impl ApprovalRequest {
+    pub fn new(request_id: uuid::Uuid, requester: models::Entity, created_at: i64, acct_id: uuid::Uuid, operation: String, method: String, approvers: Vec<models::Entity>, status: models::ApprovalRequestStatus, expiry: i64, ) -> ApprovalRequest {
+        ApprovalRequest {
+            request_id: request_id,
+            requester: requester,
+            created_at: created_at,
+            acct_id: acct_id,
+            operation: operation,
+            method: method,
+            body: None,
+            approvers: approvers,
+            denier: None,
+            denial_reason: None,
+            reviewers: None,
+            status: status,
+            subjects: None,
+            description: None,
+            expiry: expiry,
+        }
+    }
+}
 
 
+/// Request to create an approval request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApprovalRequestRequest {
+    /// Operation URL path, e.g. `/crypto/v1/keys`, `/crypto/v1/groups/<id>`.
+    #[serde(rename = "operation")]
+    pub operation: String,
+
+    /// Method for the operation: POST, PATCH, PUT, DELETE, or GET. Default is POST.
+    #[serde(rename = "method")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub method: Option<String>,
+
+    #[serde(rename = "body")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub body: Option<serde_json::Value>,
+
+    /// Optional comment about the approval request for the reviewer.
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+}
+
+impl ApprovalRequestRequest {
+    pub fn new(operation: String, ) -> ApprovalRequestRequest {
+        ApprovalRequestRequest {
+            operation: operation,
+            method: None,
+            body: None,
+            description: None,
+        }
+    }
+}
 
 
+/// Approval request status.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
+#[allow(non_camel_case_types)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
+pub enum ApprovalRequestStatus { 
+    #[serde(rename = "PENDING")]
+    PENDING,
+    #[serde(rename = "APPROVED")]
+    APPROVED,
+    #[serde(rename = "DENIED")]
+    DENIED,
+    #[serde(rename = "FAILED")]
+    FAILED,
+}
+
+impl ::std::fmt::Display for ApprovalRequestStatus {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self { 
+            ApprovalRequestStatus::PENDING => write!(f, "{}", "PENDING"),
+            ApprovalRequestStatus::APPROVED => write!(f, "{}", "APPROVED"),
+            ApprovalRequestStatus::DENIED => write!(f, "{}", "DENIED"),
+            ApprovalRequestStatus::FAILED => write!(f, "{}", "FAILED"),
+        }
+    }
+}
+
+impl ::std::str::FromStr for ApprovalRequestStatus {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "PENDING" => Ok(ApprovalRequestStatus::PENDING),
+            "APPROVED" => Ok(ApprovalRequestStatus::APPROVED),
+            "DENIED" => Ok(ApprovalRequestStatus::DENIED),
+            "FAILED" => Ok(ApprovalRequestStatus::FAILED),
+            _ => Err(()),
+        }
+    }
+}
+
+
+/// Approval status
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -720,108 +1319,88 @@ impl ::std::str::FromStr for ApprovalStatus {
 }
 
 
+/// Identifies an object acted upon by an approval request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApprovalSubject {
+    /// The ID of the workflow being acted upon.
+    #[serde(rename = "workflow")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub workflow: Option<uuid::Uuid>,
+
+}
+
+impl ApprovalSubject {
+    pub fn new() -> ApprovalSubject {
+        ApprovalSubject {
+            workflow: None,
+        }
+    }
+}
+
+
+/// Optional parameters for approve request
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ApproveRequest {
+    /// Password is required if the approval policy requires password authentication.
+    #[serde(rename = "password")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub password: Option<String>,
+
+    /// U2F is required if the approval policy requires two factor authentication.
+    #[serde(rename = "u2f")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub u2f: Option<String>,
+
+    /// Data associated with the approval
+    #[serde(rename = "body")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub body: Option<serde_json::Value>,
+
+}
+
+impl ApproveRequest {
+    pub fn new() -> ApproveRequest {
+        ApproveRequest {
+            password: None,
+            u2f: None,
+            body: None,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AttestationRequest {
-    /// IAS Quote report bytes
+    /// IAS Quote report bytes.
     #[serde(rename = "ias_quote")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub ias_quote: Option<crate::ByteArray>,
+    pub ias_quote: crate::ByteArray,
 
-    /// Certificate Signing Request bytes
+    /// Certificate Signing Request bytes.
     #[serde(rename = "csr")]
+    pub csr: String,
+
+    /// Node Attestation type (DCAP or EPID)
+    #[serde(rename = "attestation_type")]
     #[serde(skip_serializing_if="Option::is_none")]
-    pub csr: Option<String>,
+    pub attestation_type: Option<String>,
 
 }
 
 impl AttestationRequest {
-    pub fn new() -> AttestationRequest {
+    pub fn new(ias_quote: crate::ByteArray, csr: String, ) -> AttestationRequest {
         AttestationRequest {
-            ias_quote: None,
-            csr: None,
+            ias_quote: ias_quote,
+            csr: csr,
+            attestation_type: None,
         }
     }
 }
 
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct AuditLog {
-    /// Log Entry Id
-    #[serde(rename = "log_id")]
-    pub log_id: uuid::Uuid,
-
-    /// Zone Id
-    #[serde(rename = "zone_id")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub zone_id: Option<uuid::Uuid>,
-
-    #[serde(rename = "severity")]
-    pub severity: models::EventSeverity,
-
-    /// Description of the event
-    #[serde(rename = "description")]
-    pub description: String,
-
-    /// Event timestamp
-    #[serde(rename = "timestamp")]
-    pub timestamp: i64,
-
-    #[serde(rename = "action_type")]
-    pub action_type: models::EventActionType,
-
-    #[serde(rename = "actor_type")]
-    pub actor_type: models::EventActorType,
-
-    /// User Id, if actor is a user
-    #[serde(rename = "user_id")]
-    pub user_id: uuid::Uuid,
-
-    /// User Name, if actor is a user
-    #[serde(rename = "user_name")]
-    pub user_name: String,
-
-    /// App Id, if actor is an app
-    #[serde(rename = "app_id")]
-    pub app_id: uuid::Uuid,
-
-    /// App Name, if actor is an app
-    #[serde(rename = "app_name")]
-    pub app_name: String,
-
-    /// Node Id, if associated with the event
-    #[serde(rename = "node_id")]
-    pub node_id: uuid::Uuid,
-
-    /// Node Name, if associated with the event
-    #[serde(rename = "node_name")]
-    pub node_name: String,
-
-}
-
-impl AuditLog {
-    pub fn new(log_id: uuid::Uuid, severity: models::EventSeverity, description: String, timestamp: i64, action_type: models::EventActionType, actor_type: models::EventActorType, user_id: uuid::Uuid, user_name: String, app_id: uuid::Uuid, app_name: String, node_id: uuid::Uuid, node_name: String, ) -> AuditLog {
-        AuditLog {
-            log_id: log_id,
-            zone_id: None,
-            severity: severity,
-            description: description,
-            timestamp: timestamp,
-            action_type: action_type,
-            actor_type: actor_type,
-            user_id: user_id,
-            user_name: user_name,
-            app_id: app_id,
-            app_name: app_name,
-            node_id: node_id,
-            node_name: node_name,
-        }
-    }
-}
-
-
-
+/// Credentials for authenticating to a docker registry
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AuthConfig {
@@ -849,11 +1428,180 @@ impl AuthConfig {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthConfigOauth {
+    #[serde(rename = "idp_name")]
+    pub idp_name: String,
+
+    #[serde(rename = "idp_icon_url")]
+    pub idp_icon_url: String,
+
+    #[serde(rename = "idp_authorization_endpoint")]
+    pub idp_authorization_endpoint: String,
+
+    #[serde(rename = "idp_token_endpoint")]
+    pub idp_token_endpoint: String,
+
+    #[serde(rename = "idp_requires_basic_auth")]
+    pub idp_requires_basic_auth: bool,
+
+    #[serde(rename = "idp_userinfo_endpoint")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub idp_userinfo_endpoint: Option<String>,
+
+    #[serde(rename = "tls")]
+    pub tls: models::TlsConfig,
+
+    #[serde(rename = "client_id")]
+    pub client_id: String,
+
+    #[serde(rename = "client_secret")]
+    pub client_secret: String,
+
+}
+
+impl AuthConfigOauth {
+    pub fn new(idp_name: String, idp_icon_url: String, idp_authorization_endpoint: String, idp_token_endpoint: String, idp_requires_basic_auth: bool, tls: models::TlsConfig, client_id: String, client_secret: String, ) -> AuthConfigOauth {
+        AuthConfigOauth {
+            idp_name: idp_name,
+            idp_icon_url: idp_icon_url,
+            idp_authorization_endpoint: idp_authorization_endpoint,
+            idp_token_endpoint: idp_token_endpoint,
+            idp_requires_basic_auth: idp_requires_basic_auth,
+            idp_userinfo_endpoint: None,
+            tls: tls,
+            client_id: client_id,
+            client_secret: client_secret,
+        }
+    }
+}
+
+
+/// Configuration for password-based authentication.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthConfigPassword {
+    #[serde(rename = "require_2fa")]
+    pub require_2fa: bool,
+
+    #[serde(rename = "administrators_only")]
+    pub administrators_only: bool,
+
+}
+
+impl AuthConfigPassword {
+    pub fn new(require_2fa: bool, administrators_only: bool, ) -> AuthConfigPassword {
+        AuthConfigPassword {
+            require_2fa: require_2fa,
+            administrators_only: administrators_only,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthConfigRef {
+    #[serde(rename = "target_id")]
+    pub target_id: String,
+
+}
+
+impl AuthConfigRef {
+    pub fn new(target_id: String, ) -> AuthConfigRef {
+        AuthConfigRef {
+            target_id: target_id,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthDiscoverRequest {
+    /// User email
+    #[serde(rename = "user_email")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub user_email: Option<String>,
+
+}
+
+impl AuthDiscoverRequest {
+    pub fn new() -> AuthDiscoverRequest {
+        AuthDiscoverRequest {
+            user_email: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthDiscoverResponse {
+    #[serde(rename = "auth_methods")]
+    pub auth_methods: Vec<models::AuthMethod>,
+
+}
+
+impl AuthDiscoverResponse {
+    pub fn new(auth_methods: Vec<models::AuthMethod>, ) -> AuthDiscoverResponse {
+        AuthDiscoverResponse {
+            auth_methods: auth_methods,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthMethod {
+    #[serde(rename = "password")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub password: Option<serde_json::Value>,
+
+    #[serde(rename = "oauth_code_grant")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub oauth_code_grant: Option<models::OauthAuthCodeGrant>,
+
+}
+
+impl AuthMethod {
+    pub fn new() -> AuthMethod {
+        AuthMethod {
+            password: None,
+            oauth_code_grant: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthRequest {
+    #[serde(rename = "oauth_auth_code")]
+    pub oauth_auth_code: models::OauthCodeData,
+
+}
+
+impl AuthRequest {
+    pub fn new(oauth_auth_code: models::OauthCodeData, ) -> AuthRequest {
+        AuthRequest {
+            oauth_auth_code: oauth_auth_code,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AuthResponse {
-    /// Bearer token to be used to authenticate to other APIs
+    /// Bearer token to be used to authenticate to other APIs.
     #[serde(rename = "access_token")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub access_token: Option<String>,
+
+    #[serde(rename = "session_info")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub session_info: Option<models::SessionInfo>,
 
 }
 
@@ -861,6 +1609,35 @@ impl AuthResponse {
     pub fn new() -> AuthResponse {
         AuthResponse {
             access_token: None,
+            session_info: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct AuthenticationConfig {
+    #[serde(rename = "password")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub password: Option<models::AuthConfigPassword>,
+
+    #[serde(rename = "oauth")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub oauth: Option<models::AuthConfigOauth>,
+
+    #[serde(rename = "cluster_auth_ref")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub cluster_auth_ref: Option<models::AuthConfigRef>,
+
+}
+
+impl AuthenticationConfig {
+    pub fn new() -> AuthenticationConfig {
+        AuthenticationConfig {
+            password: None,
+            oauth: None,
+            cluster_auth_ref: None,
         }
     }
 }
@@ -896,11 +1673,11 @@ impl BackendNodeProvisionRequest {
 }
 
 
-
+/// Detailed info of an application image.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct Build {
-    /// Build Id
+    /// Image Id
     #[serde(rename = "build_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub build_id: Option<uuid::Uuid>,
@@ -909,12 +1686,12 @@ pub struct Build {
     #[serde(skip_serializing_if="Option::is_none")]
     pub docker_info: Option<models::DockerInfo>,
 
-    /// Timestamp of build addition to the system
+    /// Timestamp of image addition to the system.
     #[serde(rename = "created_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub created_at: Option<i64>,
 
-    /// Timestamp of build updation to the system
+    /// Timestamp of image updation to the system.
     #[serde(rename = "updated_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub updated_at: Option<i64>,
@@ -945,12 +1722,12 @@ pub struct Build {
     #[serde(skip_serializing_if="Option::is_none")]
     pub app_description: Option<String>,
 
-    /// Mem size required for the build
+    /// Mem size required for the image.
     #[serde(rename = "mem_size")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub mem_size: Option<i64>,
 
-    /// Threads req for the build
+    /// Threads required for the image.
     #[serde(rename = "threads")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub threads: Option<i32>,
@@ -959,10 +1736,20 @@ pub struct Build {
     #[serde(skip_serializing_if="Option::is_none")]
     pub advanced_settings: Option<models::AdvancedSettings>,
 
-    /// Build name if curated app
+    /// image name if curated app.
     #[serde(rename = "build_name")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub build_name: Option<String>,
+
+    /// UUID of pending build whitelist task for the build
+    #[serde(rename = "pending_task_id")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub pending_task_id: Option<uuid::Uuid>,
+
+    /// Application configurations attached to the image.
+    #[serde(rename = "configs")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub configs: Option<HashMap<String, serde_json::Value>>,
 
 }
 
@@ -983,6 +1770,8 @@ impl Build {
             threads: None,
             advanced_settings: None,
             build_name: None,
+            pending_task_id: None,
+            configs: None,
         }
     }
 }
@@ -994,7 +1783,7 @@ pub struct BuildDeploymentStatus {
     #[serde(rename = "status")]
     pub status: models::BuildDeploymentStatusType,
 
-    /// when was the deployment status changed
+    /// The time when the deployment status changed.
     #[serde(rename = "status_updated_at")]
     pub status_updated_at: i64,
 
@@ -1010,10 +1799,10 @@ impl BuildDeploymentStatus {
 }
 
 
-
-
-
-
+/// Status string for the image deployment.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1052,7 +1841,7 @@ pub struct BuildStatus {
     #[serde(rename = "status")]
     pub status: models::BuildStatusType,
 
-    /// Time since the status change
+    /// Time since the status change.
     #[serde(rename = "status_updated_at")]
     pub status_updated_at: i64,
 
@@ -1068,10 +1857,10 @@ impl BuildStatus {
 }
 
 
-
-
-
-
+/// Status string for the image.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1110,6 +1899,24 @@ impl ::std::str::FromStr for BuildStatusType {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct BuildUpdateRequest {
+    #[serde(rename = "configs")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub configs: Option<HashMap<String, serde_json::Value>>,
+
+}
+
+impl BuildUpdateRequest {
+    pub fn new() -> BuildUpdateRequest {
+        BuildUpdateRequest {
+            configs: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct CaCertificateConfig {
     /// Path to expose the CA cert in the application filesystem
     #[serde(rename = "caPath")]
@@ -1141,6 +1948,60 @@ impl CaCertificateConfig {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct CaConfig {
+    #[serde(rename = "ca_set")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub ca_set: Option<models::CaSet>,
+
+    #[serde(rename = "pinned")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub pinned: Option<Vec<crate::ByteArray>>,
+
+}
+
+impl CaConfig {
+    pub fn new() -> CaConfig {
+        CaConfig {
+            ca_set: None,
+            pinned: None,
+        }
+    }
+}
+
+
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
+#[allow(non_camel_case_types)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
+pub enum CaSet { 
+    #[serde(rename = "GLOBAL_ROOTS")]
+    GLOBAL_ROOTS,
+}
+
+impl ::std::fmt::Display for CaSet {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self { 
+            CaSet::GLOBAL_ROOTS => write!(f, "{}", "GLOBAL_ROOTS"),
+        }
+    }
+}
+
+impl ::std::str::FromStr for CaSet {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "GLOBAL_ROOTS" => Ok(CaSet::GLOBAL_ROOTS),
+            _ => Err(()),
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct Certificate {
     /// Certificate ID
     #[serde(rename = "certificate_id")]
@@ -1151,12 +2012,12 @@ pub struct Certificate {
     #[serde(skip_serializing_if="Option::is_none")]
     pub status: Option<models::CertificateStatusType>,
 
-    /// The certificate signing request
+    /// The certificate signing request.
     #[serde(rename = "csr")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub csr: Option<String>,
 
-    /// The certificate itself, if issued
+    /// The certificate itself, if issued.
     #[serde(rename = "certificate")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub certificate: Option<String>,
@@ -1286,10 +2147,10 @@ impl CertificateDetails {
 }
 
 
-
-
-
-
+/// Certificate status
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1329,110 +2190,6 @@ impl ::std::str::FromStr for CertificateStatusType {
             "REVOKED" => Ok(CertificateStatusType::REVOKED),
             "EXPIRED" => Ok(CertificateStatusType::EXPIRED),
             _ => Err(()),
-        }
-    }
-}
-
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct ClusterCsrRequest {
-    /// Dictionary of (OID, value) items, describing the subject of the CSR
-    #[serde(rename = "subject")]
-    pub subject: HashMap<String, String>,
-
-    /// List of subjectAltName values for the CSR
-    #[serde(rename = "subject_alternative_dns_names")]
-    pub subject_alternative_dns_names: Vec<String>,
-
-}
-
-impl ClusterCsrRequest {
-    pub fn new(subject: HashMap<String, String>, subject_alternative_dns_names: Vec<String>, ) -> ClusterCsrRequest {
-        ClusterCsrRequest {
-            subject: subject,
-            subject_alternative_dns_names: subject_alternative_dns_names,
-        }
-    }
-}
-
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct ClusterCsrResponse {
-    /// DER-encoded certificate signing request
-    #[serde(rename = "csr")]
-    pub csr: crate::ByteArray,
-
-}
-
-impl ClusterCsrResponse {
-    pub fn new(csr: crate::ByteArray, ) -> ClusterCsrResponse {
-        ClusterCsrResponse {
-            csr: csr,
-        }
-    }
-}
-
-
-
-
-
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
-pub enum ClusterState { 
-    #[serde(rename = "NOCLUSTER")]
-    NOCLUSTER,
-    #[serde(rename = "ZONENODE")]
-    ZONENODE,
-    #[serde(rename = "NOZONENODE")]
-    NOZONENODE,
-    #[serde(rename = "ERROR")]
-    ERROR,
-}
-
-impl ::std::fmt::Display for ClusterState {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match *self { 
-            ClusterState::NOCLUSTER => write!(f, "{}", "NOCLUSTER"),
-            ClusterState::ZONENODE => write!(f, "{}", "ZONENODE"),
-            ClusterState::NOZONENODE => write!(f, "{}", "NOZONENODE"),
-            ClusterState::ERROR => write!(f, "{}", "ERROR"),
-        }
-    }
-}
-
-impl ::std::str::FromStr for ClusterState {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "NOCLUSTER" => Ok(ClusterState::NOCLUSTER),
-            "ZONENODE" => Ok(ClusterState::ZONENODE),
-            "NOZONENODE" => Ok(ClusterState::NOZONENODE),
-            "ERROR" => Ok(ClusterState::ERROR),
-            _ => Err(()),
-        }
-    }
-}
-
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct ConfigureClusterRequest {
-    /// DER-encoded certificate chain for the cluster's public client interface
-    #[serde(rename = "public_if_cert_chain")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub public_if_cert_chain: Option<Vec<crate::ByteArray>>,
-
-}
-
-impl ConfigureClusterRequest {
-    pub fn new() -> ConfigureClusterRequest {
-        ConfigureClusterRequest {
-            public_if_cert_chain: None,
         }
     }
 }
@@ -1672,13 +2429,24 @@ impl ConversionResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ConvertAppBuildRequest {
-    /// app id of the build
+    /// App id of the image.
     #[serde(rename = "app_id")]
     pub app_id: uuid::Uuid,
 
-    /// Build docker version
+    /// Common Image docker version for both input and output.
     #[serde(rename = "docker_version")]
-    pub docker_version: String,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub docker_version: Option<String>,
+
+    /// Input Image docker version.
+    #[serde(rename = "input_docker_version")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub input_docker_version: Option<String>,
+
+    /// Output Image docker version.
+    #[serde(rename = "output_docker_version")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub output_docker_version: Option<String>,
 
     #[serde(rename = "inputAuthConfig")]
     #[serde(skip_serializing_if="Option::is_none")]
@@ -1692,17 +2460,17 @@ pub struct ConvertAppBuildRequest {
     #[serde(skip_serializing_if="Option::is_none")]
     pub auth_config: Option<models::AuthConfig>,
 
-    /// Enables debug logging from EnclaveOS
+    /// Enables debug logging from EnclaveOS.
     #[serde(rename = "debug")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub debug: Option<bool>,
 
-    /// Mem size required for the build
+    /// Mem size required for the image.
     #[serde(rename = "memSize")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub mem_size: Option<i64>,
 
-    /// Threads req for the build
+    /// Threads required for the image.
     #[serde(rename = "threads")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub threads: Option<i32>,
@@ -1710,10 +2478,12 @@ pub struct ConvertAppBuildRequest {
 }
 
 impl ConvertAppBuildRequest {
-    pub fn new(app_id: uuid::Uuid, docker_version: String, ) -> ConvertAppBuildRequest {
+    pub fn new(app_id: uuid::Uuid, ) -> ConvertAppBuildRequest {
         ConvertAppBuildRequest {
             app_id: app_id,
-            docker_version: docker_version,
+            docker_version: None,
+            input_docker_version: None,
+            output_docker_version: None,
             input_auth_config: None,
             output_auth_config: None,
             auth_config: None,
@@ -1732,38 +2502,38 @@ pub struct CreateBuildRequest {
     #[serde(skip_serializing_if="Option::is_none")]
     pub docker_info: Option<models::DockerInfo>,
 
-    /// mrenclave of the build
+    /// mrenclave of the image.
     #[serde(rename = "mrenclave")]
     pub mrenclave: String,
 
-    /// mrsigner of the build
+    /// mrsigner of the image.
     #[serde(rename = "mrsigner")]
     pub mrsigner: String,
 
-    /// isvprodid of the build
+    /// IsvProdId of the image.
     #[serde(rename = "isvprodid")]
     pub isvprodid: i32,
 
-    /// isvsvn of the build
+    /// ISVSVN of the image.
     #[serde(rename = "isvsvn")]
     pub isvsvn: i32,
 
-    /// app id of the build
+    /// App id of the image.
     #[serde(rename = "app_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub app_id: Option<uuid::Uuid>,
 
-    /// app name of the build
+    /// App name of the image.
     #[serde(rename = "app_name")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub app_name: Option<String>,
 
-    /// Mem size required for the build
+    /// Mem size required for the image.
     #[serde(rename = "mem_size")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub mem_size: Option<i64>,
 
-    /// Threads req for the build
+    /// Threads required for the image.
     #[serde(rename = "threads")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub threads: Option<i32>,
@@ -1794,40 +2564,309 @@ impl CreateBuildRequest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct CreateClusterRequest {
-    /// Name of the cluster to create
+pub struct CreateDatasetRequest {
     #[serde(rename = "name")]
     pub name: String,
 
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "labels")]
+    pub labels: HashMap<String, String>,
+
+    #[serde(rename = "location")]
+    pub location: String,
+
+    #[serde(rename = "credentials")]
+    pub credentials: models::DatasetCredentialsRequest,
+
 }
 
-impl CreateClusterRequest {
-    pub fn new(name: String, ) -> CreateClusterRequest {
-        CreateClusterRequest {
+impl CreateDatasetRequest {
+    pub fn new(name: String, description: String, labels: HashMap<String, String>, location: String, credentials: models::DatasetCredentialsRequest, ) -> CreateDatasetRequest {
+        CreateDatasetRequest {
             name: name,
+            description: description,
+            labels: labels,
+            location: location,
+            credentials: credentials,
         }
     }
 }
 
 
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct CreateFinalWorkflowGraph {
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "contents")]
+    pub contents: models::CreateWorkflowVersionRequest,
+
+}
+
+impl CreateFinalWorkflowGraph {
+    pub fn new(name: String, description: String, contents: models::CreateWorkflowVersionRequest, ) -> CreateFinalWorkflowGraph {
+        CreateFinalWorkflowGraph {
+            name: name,
+            description: description,
+            contents: contents,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct CreateWorkflowGraph {
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "objects")]
+    pub objects: SortedHashMap<String, models::WorkflowObject>,
+
+    #[serde(rename = "edges")]
+    pub edges: SortedHashMap<String, models::WorkflowEdge>,
+
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::WorkflowMetadata>,
+
+}
+
+impl CreateWorkflowGraph {
+    pub fn new(name: String, description: String, objects: SortedHashMap<String, models::WorkflowObject>, edges: SortedHashMap<String, models::WorkflowEdge>, ) -> CreateWorkflowGraph {
+        CreateWorkflowGraph {
+            name: name,
+            description: description,
+            objects: objects,
+            edges: edges,
+            metadata: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct CreateWorkflowVersionRequest {
+    #[serde(rename = "objects")]
+    pub objects: SortedHashMap<String, models::WorkflowObject>,
+
+    #[serde(rename = "edges")]
+    pub edges: SortedHashMap<String, models::WorkflowEdge>,
+
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::WorkflowMetadata>,
+
+}
+
+impl CreateWorkflowVersionRequest {
+    pub fn new(objects: SortedHashMap<String, models::WorkflowObject>, edges: SortedHashMap<String, models::WorkflowEdge>, ) -> CreateWorkflowVersionRequest {
+        CreateWorkflowVersionRequest {
+            objects: objects,
+            edges: edges,
+            metadata: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct CredentialType {
+    #[serde(rename = "default")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub default: Option<models::AuthConfig>,
+
+}
+
+impl CredentialType {
+    pub fn new() -> CredentialType {
+        CredentialType {
+            default: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct Dataset {
+    #[serde(rename = "dataset_id")]
+    pub dataset_id: uuid::Uuid,
+
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "owner")]
+    pub owner: uuid::Uuid,
+
+    /// Dataset creation time.
+    #[serde(rename = "created_at")]
+    pub created_at: i64,
+
+    /// Last update timestamp.
+    #[serde(rename = "updated_at")]
+    pub updated_at: i64,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "location")]
+    pub location: String,
+
+    #[serde(rename = "labels")]
+    pub labels: HashMap<String, String>,
+
+    #[serde(rename = "credentials")]
+    pub credentials: models::DatasetCredentials,
+
+}
+
+impl Dataset {
+    pub fn new(dataset_id: uuid::Uuid, name: String, owner: uuid::Uuid, created_at: i64, updated_at: i64, description: String, location: String, labels: HashMap<String, String>, credentials: models::DatasetCredentials, ) -> Dataset {
+        Dataset {
+            dataset_id: dataset_id,
+            name: name,
+            owner: owner,
+            created_at: created_at,
+            updated_at: updated_at,
+            description: description,
+            location: location,
+            labels: labels,
+            credentials: credentials,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct DatasetCredentials {
+    #[serde(rename = "sdkms")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub sdkms: Option<models::SdkmsCredentials>,
+
+}
+
+impl DatasetCredentials {
+    pub fn new() -> DatasetCredentials {
+        DatasetCredentials {
+            sdkms: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct DatasetCredentialsRequest {
+    #[serde(rename = "contents")]
+    pub contents: String,
+
+}
+
+impl DatasetCredentialsRequest {
+    pub fn new(contents: String, ) -> DatasetCredentialsRequest {
+        DatasetCredentialsRequest {
+            contents: contents,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct DatasetUpdateRequest {
+    #[serde(rename = "name")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "labels")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub labels: Option<HashMap<String, String>>,
+
+    #[serde(rename = "location")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub location: Option<String>,
+
+    #[serde(rename = "credentials")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub credentials: Option<models::DatasetCredentialsRequest>,
+
+}
+
+impl DatasetUpdateRequest {
+    pub fn new() -> DatasetUpdateRequest {
+        DatasetUpdateRequest {
+            name: None,
+            description: None,
+            labels: None,
+            location: None,
+            credentials: None,
+        }
+    }
+}
+
+
+/// Optional parameters for deny request
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct DenyRequest {
+    /// Reason associated with the denial
+    #[serde(rename = "reason")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub reason: Option<String>,
+
+}
+
+impl DenyRequest {
+    pub fn new() -> DenyRequest {
+        DenyRequest {
+            reason: None,
+        }
+    }
+}
+
+
+/// Docker info of an image.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct DockerInfo {
-    /// Build docker image name
+    /// Image docker image name.
     #[serde(rename = "docker_image_name")]
     pub docker_image_name: String,
 
-    /// Build docker version
+    /// image docker version.
     #[serde(rename = "docker_version")]
     pub docker_version: String,
 
-    /// Build docker image sha
+    /// Build docker image sha.
     #[serde(rename = "docker_image_sha")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub docker_image_sha: Option<String>,
 
-    /// Docker image size in kb
+    /// Docker image size in kb.
     #[serde(rename = "docker_image_size")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub docker_image_size: Option<i64>,
@@ -1846,15 +2885,15 @@ impl DockerInfo {
 }
 
 
-
+/// Info on a application enclave.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct EnclaveInfo {
-    /// mrenclave of a build, as a hex string
+    /// mrenclave of an image, as a hex string.
     #[serde(rename = "mrenclave")]
     pub mrenclave: String,
 
-    /// mr signer of a build, as a hex string
+    /// mr signer of an image, as a hex string.
     #[serde(rename = "mrsigner")]
     pub mrsigner: String,
 
@@ -1880,10 +2919,57 @@ impl EnclaveInfo {
 }
 
 
+/// An app, user, or plugin ID.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct Entity {
+    /// The user ID of the user who created this entity, if this entity was created by a user.
+    #[serde(rename = "user")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub user: Option<uuid::Uuid>,
+
+}
+
+impl Entity {
+    pub fn new() -> Entity {
+        Entity {
+            user: None,
+        }
+    }
+}
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct Event {
+    /// Event Message
+    #[serde(rename = "message")]
+    pub message: String,
+
+    #[serde(rename = "code")]
+    pub code: models::EventType,
+
+    #[serde(rename = "severity")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub severity: Option<models::EventSeverity>,
+
+}
+
+impl Event {
+    pub fn new(message: String, code: models::EventType, ) -> Event {
+        Event {
+            message: message,
+            code: code,
+            severity: None,
+        }
+    }
+}
 
 
+/// Event action type.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1940,10 +3026,10 @@ impl ::std::str::FromStr for EventActionType {
 }
 
 
-
-
-
-
+/// Event actor type.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1980,10 +3066,10 @@ impl ::std::str::FromStr for EventActorType {
 }
 
 
-
-
-
-
+/// Event severity
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -2024,6 +3110,249 @@ impl ::std::str::FromStr for EventSeverity {
 }
 
 
+/// String enumeration identifying the event
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
+#[allow(non_camel_case_types)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
+pub enum EventType { 
+    #[serde(rename = "BAD_REQUEST")]
+    BAD_REQUEST,
+    #[serde(rename = "NODE_NOT_ENROLLED")]
+    NODE_NOT_ENROLLED,
+    #[serde(rename = "INVALID_NAME")]
+    INVALID_NAME,
+    #[serde(rename = "INVALID_VALUE")]
+    INVALID_VALUE,
+    #[serde(rename = "UN_AUTHORIZED")]
+    UN_AUTHORIZED,
+    #[serde(rename = "NO_ACCOUNT_SELECTED")]
+    NO_ACCOUNT_SELECTED,
+    #[serde(rename = "NO_ZONE_SELECTED")]
+    NO_ZONE_SELECTED,
+    #[serde(rename = "ATTESTATION_REQUIRED")]
+    ATTESTATION_REQUIRED,
+    #[serde(rename = "NOT_FOUND")]
+    NOT_FOUND,
+    #[serde(rename = "UNIQUE_VIOLATION")]
+    UNIQUE_VIOLATION,
+    #[serde(rename = "KEY_UNIQUE_VIOLATION")]
+    KEY_UNIQUE_VIOLATION,
+    #[serde(rename = "INVALID_STATE")]
+    INVALID_STATE,
+    #[serde(rename = "USER_ALREADY_EXISTS")]
+    USER_ALREADY_EXISTS,
+    #[serde(rename = "FORBIDDEN")]
+    FORBIDDEN,
+    #[serde(rename = "AUTH_FAILED")]
+    AUTH_FAILED,
+    #[serde(rename = "INVALID_SESSION")]
+    INVALID_SESSION,
+    #[serde(rename = "SESSION_EXPIRED")]
+    SESSION_EXPIRED,
+    #[serde(rename = "CERT_PARSE_ERROR")]
+    CERT_PARSE_ERROR,
+    #[serde(rename = "QUOTA_EXCEEDED")]
+    QUOTA_EXCEEDED,
+    #[serde(rename = "USER_ACCOUNT_PENDING")]
+    USER_ACCOUNT_PENDING,
+    #[serde(rename = "INTERNAL_SERVER_ERROR")]
+    INTERNAL_SERVER_ERROR,
+    #[serde(rename = "MISSING_REQUIRED_PARAMETER")]
+    MISSING_REQUIRED_PARAMETER,
+    #[serde(rename = "INVALID_PATH_PARAMETER")]
+    INVALID_PATH_PARAMETER,
+    #[serde(rename = "INVALID_HEADER")]
+    INVALID_HEADER,
+    #[serde(rename = "INVALID_QUERY_PARAMETER")]
+    INVALID_QUERY_PARAMETER,
+    #[serde(rename = "INVALID_BODY_PARAMETER")]
+    INVALID_BODY_PARAMETER,
+    #[serde(rename = "METHOD_NOT_ALLOWED")]
+    METHOD_NOT_ALLOWED,
+    #[serde(rename = "LATEST_EULA_NOT_ACCEPTED")]
+    LATEST_EULA_NOT_ACCEPTED,
+    #[serde(rename = "CONFLICT")]
+    CONFLICT,
+    #[serde(rename = "DCAP_ARTIFACT_RETRIEVAL_ERROR")]
+    DCAP_ARTIFACT_RETRIEVAL_ERROR,
+    #[serde(rename = "DCAP_ERROR")]
+    DCAP_ERROR,
+    #[serde(rename = "DCAP_ARTIFACT_SERIALIZATION_ERROR")]
+    DCAP_ARTIFACT_SERIALIZATION_ERROR,
+    #[serde(rename = "DCAP_ARTIFACT_DESERIALIZATION_ERROR")]
+    DCAP_ARTIFACT_DESERIALIZATION_ERROR,
+    #[serde(rename = "LOCKED")]
+    LOCKED,
+    #[serde(rename = "UNDERGOING_MAINTENANCE")]
+    UNDERGOING_MAINTENANCE,
+}
+
+impl ::std::fmt::Display for EventType {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self { 
+            EventType::BAD_REQUEST => write!(f, "{}", "BAD_REQUEST"),
+            EventType::NODE_NOT_ENROLLED => write!(f, "{}", "NODE_NOT_ENROLLED"),
+            EventType::INVALID_NAME => write!(f, "{}", "INVALID_NAME"),
+            EventType::INVALID_VALUE => write!(f, "{}", "INVALID_VALUE"),
+            EventType::UN_AUTHORIZED => write!(f, "{}", "UN_AUTHORIZED"),
+            EventType::NO_ACCOUNT_SELECTED => write!(f, "{}", "NO_ACCOUNT_SELECTED"),
+            EventType::NO_ZONE_SELECTED => write!(f, "{}", "NO_ZONE_SELECTED"),
+            EventType::ATTESTATION_REQUIRED => write!(f, "{}", "ATTESTATION_REQUIRED"),
+            EventType::NOT_FOUND => write!(f, "{}", "NOT_FOUND"),
+            EventType::UNIQUE_VIOLATION => write!(f, "{}", "UNIQUE_VIOLATION"),
+            EventType::KEY_UNIQUE_VIOLATION => write!(f, "{}", "KEY_UNIQUE_VIOLATION"),
+            EventType::INVALID_STATE => write!(f, "{}", "INVALID_STATE"),
+            EventType::USER_ALREADY_EXISTS => write!(f, "{}", "USER_ALREADY_EXISTS"),
+            EventType::FORBIDDEN => write!(f, "{}", "FORBIDDEN"),
+            EventType::AUTH_FAILED => write!(f, "{}", "AUTH_FAILED"),
+            EventType::INVALID_SESSION => write!(f, "{}", "INVALID_SESSION"),
+            EventType::SESSION_EXPIRED => write!(f, "{}", "SESSION_EXPIRED"),
+            EventType::CERT_PARSE_ERROR => write!(f, "{}", "CERT_PARSE_ERROR"),
+            EventType::QUOTA_EXCEEDED => write!(f, "{}", "QUOTA_EXCEEDED"),
+            EventType::USER_ACCOUNT_PENDING => write!(f, "{}", "USER_ACCOUNT_PENDING"),
+            EventType::INTERNAL_SERVER_ERROR => write!(f, "{}", "INTERNAL_SERVER_ERROR"),
+            EventType::MISSING_REQUIRED_PARAMETER => write!(f, "{}", "MISSING_REQUIRED_PARAMETER"),
+            EventType::INVALID_PATH_PARAMETER => write!(f, "{}", "INVALID_PATH_PARAMETER"),
+            EventType::INVALID_HEADER => write!(f, "{}", "INVALID_HEADER"),
+            EventType::INVALID_QUERY_PARAMETER => write!(f, "{}", "INVALID_QUERY_PARAMETER"),
+            EventType::INVALID_BODY_PARAMETER => write!(f, "{}", "INVALID_BODY_PARAMETER"),
+            EventType::METHOD_NOT_ALLOWED => write!(f, "{}", "METHOD_NOT_ALLOWED"),
+            EventType::LATEST_EULA_NOT_ACCEPTED => write!(f, "{}", "LATEST_EULA_NOT_ACCEPTED"),
+            EventType::CONFLICT => write!(f, "{}", "CONFLICT"),
+            EventType::DCAP_ARTIFACT_RETRIEVAL_ERROR => write!(f, "{}", "DCAP_ARTIFACT_RETRIEVAL_ERROR"),
+            EventType::DCAP_ERROR => write!(f, "{}", "DCAP_ERROR"),
+            EventType::DCAP_ARTIFACT_SERIALIZATION_ERROR => write!(f, "{}", "DCAP_ARTIFACT_SERIALIZATION_ERROR"),
+            EventType::DCAP_ARTIFACT_DESERIALIZATION_ERROR => write!(f, "{}", "DCAP_ARTIFACT_DESERIALIZATION_ERROR"),
+            EventType::LOCKED => write!(f, "{}", "LOCKED"),
+            EventType::UNDERGOING_MAINTENANCE => write!(f, "{}", "UNDERGOING_MAINTENANCE"),
+        }
+    }
+}
+
+impl ::std::str::FromStr for EventType {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "BAD_REQUEST" => Ok(EventType::BAD_REQUEST),
+            "NODE_NOT_ENROLLED" => Ok(EventType::NODE_NOT_ENROLLED),
+            "INVALID_NAME" => Ok(EventType::INVALID_NAME),
+            "INVALID_VALUE" => Ok(EventType::INVALID_VALUE),
+            "UN_AUTHORIZED" => Ok(EventType::UN_AUTHORIZED),
+            "NO_ACCOUNT_SELECTED" => Ok(EventType::NO_ACCOUNT_SELECTED),
+            "NO_ZONE_SELECTED" => Ok(EventType::NO_ZONE_SELECTED),
+            "ATTESTATION_REQUIRED" => Ok(EventType::ATTESTATION_REQUIRED),
+            "NOT_FOUND" => Ok(EventType::NOT_FOUND),
+            "UNIQUE_VIOLATION" => Ok(EventType::UNIQUE_VIOLATION),
+            "KEY_UNIQUE_VIOLATION" => Ok(EventType::KEY_UNIQUE_VIOLATION),
+            "INVALID_STATE" => Ok(EventType::INVALID_STATE),
+            "USER_ALREADY_EXISTS" => Ok(EventType::USER_ALREADY_EXISTS),
+            "FORBIDDEN" => Ok(EventType::FORBIDDEN),
+            "AUTH_FAILED" => Ok(EventType::AUTH_FAILED),
+            "INVALID_SESSION" => Ok(EventType::INVALID_SESSION),
+            "SESSION_EXPIRED" => Ok(EventType::SESSION_EXPIRED),
+            "CERT_PARSE_ERROR" => Ok(EventType::CERT_PARSE_ERROR),
+            "QUOTA_EXCEEDED" => Ok(EventType::QUOTA_EXCEEDED),
+            "USER_ACCOUNT_PENDING" => Ok(EventType::USER_ACCOUNT_PENDING),
+            "INTERNAL_SERVER_ERROR" => Ok(EventType::INTERNAL_SERVER_ERROR),
+            "MISSING_REQUIRED_PARAMETER" => Ok(EventType::MISSING_REQUIRED_PARAMETER),
+            "INVALID_PATH_PARAMETER" => Ok(EventType::INVALID_PATH_PARAMETER),
+            "INVALID_HEADER" => Ok(EventType::INVALID_HEADER),
+            "INVALID_QUERY_PARAMETER" => Ok(EventType::INVALID_QUERY_PARAMETER),
+            "INVALID_BODY_PARAMETER" => Ok(EventType::INVALID_BODY_PARAMETER),
+            "METHOD_NOT_ALLOWED" => Ok(EventType::METHOD_NOT_ALLOWED),
+            "LATEST_EULA_NOT_ACCEPTED" => Ok(EventType::LATEST_EULA_NOT_ACCEPTED),
+            "CONFLICT" => Ok(EventType::CONFLICT),
+            "DCAP_ARTIFACT_RETRIEVAL_ERROR" => Ok(EventType::DCAP_ARTIFACT_RETRIEVAL_ERROR),
+            "DCAP_ERROR" => Ok(EventType::DCAP_ERROR),
+            "DCAP_ARTIFACT_SERIALIZATION_ERROR" => Ok(EventType::DCAP_ARTIFACT_SERIALIZATION_ERROR),
+            "DCAP_ARTIFACT_DESERIALIZATION_ERROR" => Ok(EventType::DCAP_ARTIFACT_DESERIALIZATION_ERROR),
+            "LOCKED" => Ok(EventType::LOCKED),
+            "UNDERGOING_MAINTENANCE" => Ok(EventType::UNDERGOING_MAINTENANCE),
+            _ => Err(()),
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct FinalWorkflow {
+    #[serde(rename = "graph_id")]
+    pub graph_id: uuid::Uuid,
+
+    #[serde(rename = "name")]
+    pub name: String,
+
+    /// Dataset creation time.
+    #[serde(rename = "created_at")]
+    pub created_at: i64,
+
+    /// Last update timestamp.
+    #[serde(rename = "updated_at")]
+    pub updated_at: i64,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "versions")]
+    pub versions: HashMap<String, models::FinalWorkflowGraph>,
+
+}
+
+impl FinalWorkflow {
+    pub fn new(graph_id: uuid::Uuid, name: String, created_at: i64, updated_at: i64, description: String, versions: HashMap<String, models::FinalWorkflowGraph>, ) -> FinalWorkflow {
+        FinalWorkflow {
+            graph_id: graph_id,
+            name: name,
+            created_at: created_at,
+            updated_at: updated_at,
+            description: description,
+            versions: versions,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct FinalWorkflowGraph {
+    /// Dataset creation time.
+    #[serde(rename = "created_at")]
+    pub created_at: i64,
+
+    #[serde(rename = "objects")]
+    pub objects: SortedHashMap<String, models::WorkflowObject>,
+
+    #[serde(rename = "edges")]
+    pub edges: SortedHashMap<String, models::WorkflowEdge>,
+
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::WorkflowMetadata>,
+
+    #[serde(rename = "runtime_configs")]
+    pub runtime_configs: SortedHashMap<String, models::WorkflowObjectRefApp>,
+
+}
+
+impl FinalWorkflowGraph {
+    pub fn new(created_at: i64, objects: SortedHashMap<String, models::WorkflowObject>, edges: SortedHashMap<String, models::WorkflowEdge>, runtime_configs: SortedHashMap<String, models::WorkflowObjectRefApp>, ) -> FinalWorkflowGraph {
+        FinalWorkflowGraph {
+            created_at: created_at,
+            objects: objects,
+            edges: edges,
+            metadata: None,
+            runtime_configs: runtime_configs,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ForgotPasswordRequest {
@@ -2036,6 +3365,50 @@ impl ForgotPasswordRequest {
     pub fn new(user_email: String, ) -> ForgotPasswordRequest {
         ForgotPasswordRequest {
             user_email: user_email,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct GetAllApplicationConfigsResponse {
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::SearchMetadata>,
+
+    #[serde(rename = "items")]
+    pub items: Vec<models::ApplicationConfigResponse>,
+
+}
+
+impl GetAllApplicationConfigsResponse {
+    pub fn new(items: Vec<models::ApplicationConfigResponse>, ) -> GetAllApplicationConfigsResponse {
+        GetAllApplicationConfigsResponse {
+            metadata: None,
+            items: items,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct GetAllApprovalRequests {
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::SearchMetadata>,
+
+    #[serde(rename = "items")]
+    pub items: Vec<models::ApprovalRequest>,
+
+}
+
+impl GetAllApprovalRequests {
+    pub fn new(items: Vec<models::ApprovalRequest>, ) -> GetAllApprovalRequests {
+        GetAllApprovalRequests {
+            metadata: None,
+            items: items,
         }
     }
 }
@@ -2100,6 +3473,50 @@ pub struct GetAllBuildsResponse {
 impl GetAllBuildsResponse {
     pub fn new(items: Vec<models::Build>, ) -> GetAllBuildsResponse {
         GetAllBuildsResponse {
+            metadata: None,
+            items: items,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct GetAllDatasetsResponse {
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::SearchMetadata>,
+
+    #[serde(rename = "items")]
+    pub items: Vec<models::Dataset>,
+
+}
+
+impl GetAllDatasetsResponse {
+    pub fn new(items: Vec<models::Dataset>, ) -> GetAllDatasetsResponse {
+        GetAllDatasetsResponse {
+            metadata: None,
+            items: items,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct GetAllFinalWorkflowGraphsResponse {
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::SearchMetadata>,
+
+    #[serde(rename = "items")]
+    pub items: Vec<models::FinalWorkflow>,
+
+}
+
+impl GetAllFinalWorkflowGraphsResponse {
+    pub fn new(items: Vec<models::FinalWorkflow>, ) -> GetAllFinalWorkflowGraphsResponse {
+        GetAllFinalWorkflowGraphsResponse {
             metadata: None,
             items: items,
         }
@@ -2175,21 +3592,88 @@ impl GetAllUsersResponse {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct GetAuditLogsResponse {
+pub struct GetAllWorkflowGraphsResponse {
     #[serde(rename = "metadata")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub metadata: Option<models::SearchMetadata>,
 
     #[serde(rename = "items")]
-    pub items: Vec<models::AuditLog>,
+    pub items: Vec<models::WorkflowGraph>,
 
 }
 
-impl GetAuditLogsResponse {
-    pub fn new(items: Vec<models::AuditLog>, ) -> GetAuditLogsResponse {
-        GetAuditLogsResponse {
+impl GetAllWorkflowGraphsResponse {
+    pub fn new(items: Vec<models::WorkflowGraph>, ) -> GetAllWorkflowGraphsResponse {
+        GetAllWorkflowGraphsResponse {
             metadata: None,
             items: items,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct GetPckCertResponse {
+    /// Pck Certificate(PEM-encoded)
+    #[serde(rename = "pck_cert")]
+    pub pck_cert: crate::ByteArray,
+
+}
+
+impl GetPckCertResponse {
+    pub fn new(pck_cert: crate::ByteArray, ) -> GetPckCertResponse {
+        GetPckCertResponse {
+            pck_cert: pck_cert,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct HashedConfig {
+    #[serde(rename = "app_config")]
+    pub app_config: SortedHashMap<String, models::ApplicationConfigContents>,
+
+    #[serde(rename = "labels")]
+    pub labels: SortedHashMap<String, String>,
+
+    #[serde(rename = "zone_ca")]
+    pub zone_ca: SortedVec<String>,
+
+    #[serde(rename = "workflow")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub workflow: Option<models::ApplicationConfigWorkflow>,
+
+}
+
+impl HashedConfig {
+    pub fn new(app_config: SortedHashMap<String, models::ApplicationConfigContents>, labels: SortedHashMap<String, String>, zone_ca: SortedVec<String>, ) -> HashedConfig {
+        HashedConfig {
+            app_config: app_config,
+            labels: labels,
+            zone_ca: zone_ca,
+            workflow: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct ImageRegistryResponse {
+    #[serde(rename = "registry")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub registry: Option<models::Registry>,
+
+}
+
+impl ImageRegistryResponse {
+    pub fn new() -> ImageRegistryResponse {
+        ImageRegistryResponse {
+            registry: None,
         }
     }
 }
@@ -2227,10 +3711,10 @@ impl InviteUserRequest {
 }
 
 
-
-
-
-
+/// Java runtime mode for conversion.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -2273,17 +3757,41 @@ impl ::std::str::FromStr for JavaRuntime {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct JoinClusterRequest {
-    /// Hostname or IP address of the admin interface of the cluster to join
-    #[serde(rename = "target")]
-    pub target: String,
+pub struct LabelCount {
+    #[serde(rename = "key")]
+    pub key: String,
+
+    #[serde(rename = "value")]
+    pub value: String,
+
+    #[serde(rename = "count")]
+    pub count: i32,
 
 }
 
-impl JoinClusterRequest {
-    pub fn new(target: String, ) -> JoinClusterRequest {
-        JoinClusterRequest {
-            target: target,
+impl LabelCount {
+    pub fn new(key: String, value: String, count: i32, ) -> LabelCount {
+        LabelCount {
+            key: key,
+            value: value,
+            count: count,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct LabelsCount {
+    #[serde(rename = "items")]
+    pub items: Vec<models::LabelCount>,
+
+}
+
+impl LabelsCount {
+    pub fn new(items: Vec<models::LabelCount>, ) -> LabelsCount {
+        LabelsCount {
+            items: items,
         }
     }
 }
@@ -2292,12 +3800,12 @@ impl JoinClusterRequest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct NewCertificateRequest {
-    /// Certificate signing request
+    /// Certificate signing request.
     #[serde(rename = "csr")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub csr: Option<String>,
 
-    /// Node Id for the requesting host agent
+    /// Compute Node Id for the requesting host agent
     #[serde(rename = "node_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub node_id: Option<uuid::Uuid>,
@@ -2317,34 +3825,34 @@ impl NewCertificateRequest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct Node {
-    /// Name of the node
+    /// Name of the compute node.
     #[serde(rename = "name")]
     pub name: String,
 
-    /// Description of the node
+    /// Description of the compute node.
     #[serde(rename = "description")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub description: Option<String>,
 
-    /// The account ID of the account that this node belongs to.
+    /// The account ID of the account that this compute node belongs to.
     #[serde(rename = "acct_id")]
     pub acct_id: uuid::Uuid,
 
-    /// IP Address of the node
+    /// IP Address of the compute node.
     #[serde(rename = "ipaddress")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub ipaddress: Option<String>,
 
-    /// UUID for the node
+    /// UUID for the compute node.
     #[serde(rename = "node_id")]
     pub node_id: uuid::Uuid,
 
-    /// No longer used
+    /// No longer used.
     #[serde(rename = "host_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub host_id: Option<String>,
 
-    /// Zone ID of the zone this node belongs to
+    /// Zone ID of the zone this compute node belongs to.
     #[serde(rename = "zone_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub zone_id: Option<uuid::Uuid>,
@@ -2352,22 +3860,40 @@ pub struct Node {
     #[serde(rename = "status")]
     pub status: models::NodeStatus,
 
-    /// The node attestation date
+    /// The compute node attestation date
     #[serde(rename = "attested_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub attested_at: Option<i64>,
 
-    /// The node attestation certificate
+    /// The compute node attestation certificate
     #[serde(rename = "certificate")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub certificate: Option<String>,
 
-    /// Apps associated with the node
+    /// Apps associated with the compute node.
     #[serde(rename = "apps")]
     pub apps: Vec<models::AppNodeInfo>,
 
     #[serde(rename = "sgx_info")]
     pub sgx_info: models::SgxInfo,
+
+    #[serde(rename = "labels")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub labels: Option<HashMap<String, String>>,
+
+    /// Platform information of the compute node.
+    #[serde(rename = "platform")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub platform: Option<String>,
+
+    /// Node Attestation type (DCAP or EPID)
+    #[serde(rename = "attestation_type")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub attestation_type: Option<String>,
+
+    #[serde(rename = "error_report")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub error_report: Option<models::NodeErrorReport>,
 
 }
 
@@ -2386,6 +3912,112 @@ impl Node {
             certificate: None,
             apps: apps,
             sgx_info: sgx_info,
+            labels: None,
+            platform: None,
+            attestation_type: None,
+            error_report: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct NodeErrorReport {
+    /// Error message containing the reason why node agent failed
+    #[serde(rename = "message")]
+    pub message: String,
+
+    #[serde(rename = "name")]
+    pub name: models::NodeProvisionErrorType,
+
+}
+
+impl NodeErrorReport {
+    pub fn new(message: String, name: models::NodeProvisionErrorType, ) -> NodeErrorReport {
+        NodeErrorReport {
+            message: message,
+            name: name,
+        }
+    }
+}
+
+
+/// Node agent attestation error type
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
+#[allow(non_camel_case_types)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
+pub enum NodeProvisionErrorType { 
+    #[serde(rename = "AESMD_FAILURE")]
+    AESMD_FAILURE,
+    #[serde(rename = "QUOTE_GENERATION_ERROR")]
+    QUOTE_GENERATION_ERROR,
+    #[serde(rename = "QUOTE_VERIFICATION_ERROR")]
+    QUOTE_VERIFICATION_ERROR,
+    #[serde(rename = "GROUP_OUT_OF_DATE")]
+    GROUP_OUT_OF_DATE,
+    #[serde(rename = "SIGRL_VERSION_MISMATCH")]
+    SIGRL_VERSION_MISMATCH,
+    #[serde(rename = "CONFIGURATION_NEEDED")]
+    CONFIGURATION_NEEDED,
+    #[serde(rename = "QUOTE_REVOKED")]
+    QUOTE_REVOKED,
+    #[serde(rename = "SIGNATURE_INVALID")]
+    SIGNATURE_INVALID,
+    #[serde(rename = "DCAP_ERROR")]
+    DCAP_ERROR,
+    #[serde(rename = "CPUSVN_OUT_OF_DATE")]
+    CPUSVN_OUT_OF_DATE,
+    #[serde(rename = "PSW_OUT_OF_DATE")]
+    PSW_OUT_OF_DATE,
+    #[serde(rename = "BAD_PSW")]
+    BAD_PSW,
+    #[serde(rename = "BAD DATA")]
+    BAD_DATA,
+}
+
+impl ::std::fmt::Display for NodeProvisionErrorType {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self { 
+            NodeProvisionErrorType::AESMD_FAILURE => write!(f, "{}", "AESMD_FAILURE"),
+            NodeProvisionErrorType::QUOTE_GENERATION_ERROR => write!(f, "{}", "QUOTE_GENERATION_ERROR"),
+            NodeProvisionErrorType::QUOTE_VERIFICATION_ERROR => write!(f, "{}", "QUOTE_VERIFICATION_ERROR"),
+            NodeProvisionErrorType::GROUP_OUT_OF_DATE => write!(f, "{}", "GROUP_OUT_OF_DATE"),
+            NodeProvisionErrorType::SIGRL_VERSION_MISMATCH => write!(f, "{}", "SIGRL_VERSION_MISMATCH"),
+            NodeProvisionErrorType::CONFIGURATION_NEEDED => write!(f, "{}", "CONFIGURATION_NEEDED"),
+            NodeProvisionErrorType::QUOTE_REVOKED => write!(f, "{}", "QUOTE_REVOKED"),
+            NodeProvisionErrorType::SIGNATURE_INVALID => write!(f, "{}", "SIGNATURE_INVALID"),
+            NodeProvisionErrorType::DCAP_ERROR => write!(f, "{}", "DCAP_ERROR"),
+            NodeProvisionErrorType::CPUSVN_OUT_OF_DATE => write!(f, "{}", "CPUSVN_OUT_OF_DATE"),
+            NodeProvisionErrorType::PSW_OUT_OF_DATE => write!(f, "{}", "PSW_OUT_OF_DATE"),
+            NodeProvisionErrorType::BAD_PSW => write!(f, "{}", "BAD_PSW"),
+            NodeProvisionErrorType::BAD_DATA => write!(f, "{}", "BAD DATA"),
+        }
+    }
+}
+
+impl ::std::str::FromStr for NodeProvisionErrorType {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "AESMD_FAILURE" => Ok(NodeProvisionErrorType::AESMD_FAILURE),
+            "QUOTE_GENERATION_ERROR" => Ok(NodeProvisionErrorType::QUOTE_GENERATION_ERROR),
+            "QUOTE_VERIFICATION_ERROR" => Ok(NodeProvisionErrorType::QUOTE_VERIFICATION_ERROR),
+            "GROUP_OUT_OF_DATE" => Ok(NodeProvisionErrorType::GROUP_OUT_OF_DATE),
+            "SIGRL_VERSION_MISMATCH" => Ok(NodeProvisionErrorType::SIGRL_VERSION_MISMATCH),
+            "CONFIGURATION_NEEDED" => Ok(NodeProvisionErrorType::CONFIGURATION_NEEDED),
+            "QUOTE_REVOKED" => Ok(NodeProvisionErrorType::QUOTE_REVOKED),
+            "SIGNATURE_INVALID" => Ok(NodeProvisionErrorType::SIGNATURE_INVALID),
+            "DCAP_ERROR" => Ok(NodeProvisionErrorType::DCAP_ERROR),
+            "CPUSVN_OUT_OF_DATE" => Ok(NodeProvisionErrorType::CPUSVN_OUT_OF_DATE),
+            "PSW_OUT_OF_DATE" => Ok(NodeProvisionErrorType::PSW_OUT_OF_DATE),
+            "BAD_PSW" => Ok(NodeProvisionErrorType::BAD_PSW),
+            "BAD DATA" => Ok(NodeProvisionErrorType::BAD_DATA),
+            _ => Err(()),
         }
     }
 }
@@ -2394,42 +4026,48 @@ impl Node {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct NodeProvisionRequest {
-    /// Name of the node
+    /// Name of the compute node.
     #[serde(rename = "name")]
     pub name: String,
 
-    /// Description of the node
+    /// Description of the compute node
     #[serde(rename = "description")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub description: Option<String>,
 
-    /// IP Address of the node
+    /// IP Address of the compute node.
     #[serde(rename = "ipaddress")]
     pub ipaddress: String,
 
-    /// No longer used
+    /// No longer used.
     #[serde(rename = "host_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub host_id: Option<String>,
 
-    /// Intel SGX version running on the node
+    /// Version of the Intel SGX Platform Software running on the compute node
     #[serde(rename = "sgx_version")]
     pub sgx_version: String,
 
     #[serde(rename = "attestation_request")]
-    pub attestation_request: models::AttestationRequest,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub attestation_request: Option<models::AttestationRequest>,
+
+    #[serde(rename = "error_report")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub error_report: Option<models::NodeErrorReport>,
 
 }
 
 impl NodeProvisionRequest {
-    pub fn new(name: String, ipaddress: String, sgx_version: String, attestation_request: models::AttestationRequest, ) -> NodeProvisionRequest {
+    pub fn new(name: String, ipaddress: String, sgx_version: String, ) -> NodeProvisionRequest {
         NodeProvisionRequest {
             name: name,
             description: None,
             ipaddress: ipaddress,
             host_id: None,
             sgx_version: sgx_version,
-            attestation_request: attestation_request,
+            attestation_request: None,
+            error_report: None,
         }
     }
 }
@@ -2441,13 +4079,23 @@ pub struct NodeStatus {
     #[serde(rename = "status")]
     pub status: models::NodeStatusType,
 
-    /// Node created at
+    /// Compute node creation time.
     #[serde(rename = "created_at")]
     pub created_at: i64,
 
-    /// Time since the status change
+    /// Time since the status changed.
     #[serde(rename = "status_updated_at")]
     pub status_updated_at: i64,
+
+    /// Time the node was last seen.
+    #[serde(rename = "last_seen_at")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub last_seen_at: Option<i64>,
+
+    /// Version of the node when it was last seen.
+    #[serde(rename = "last_seen_version")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub last_seen_version: Option<String>,
 
 }
 
@@ -2457,15 +4105,79 @@ impl NodeStatus {
             status: status,
             created_at: created_at,
             status_updated_at: status_updated_at,
+            last_seen_at: None,
+            last_seen_version: None,
         }
     }
 }
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct NodeStatusRequest {
+    /// Hostname of the compute node.
+    #[serde(rename = "name")]
+    pub name: String,
+
+    /// Description of the compute node.
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+    /// IP Address of the compute node.
+    #[serde(rename = "ipaddress")]
+    pub ipaddress: String,
+
+    #[serde(rename = "status")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub status: Option<models::NodeStatus>,
+
+    /// Version of the Intel SGX Platform Software running on the compute node
+    #[serde(rename = "sgx_version")]
+    pub sgx_version: String,
+
+}
+
+impl NodeStatusRequest {
+    pub fn new(name: String, ipaddress: String, sgx_version: String, ) -> NodeStatusRequest {
+        NodeStatusRequest {
+            name: name,
+            description: None,
+            ipaddress: ipaddress,
+            status: None,
+            sgx_version: sgx_version,
+        }
+    }
+}
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct NodeStatusResponse {
+    /// Interval between node agent checkins with the backend, in seconds
+    #[serde(rename = "node_refresh_interval")]
+    pub node_refresh_interval: i64,
+
+    /// The node agent requests certificate renewal when the certificate's remaining validity is less than this percentage of the original validity
+    #[serde(rename = "node_renewal_threshold")]
+    pub node_renewal_threshold: i32,
+
+}
+
+impl NodeStatusResponse {
+    pub fn new(node_refresh_interval: i64, node_renewal_threshold: i32, ) -> NodeStatusResponse {
+        NodeStatusResponse {
+            node_refresh_interval: node_refresh_interval,
+            node_renewal_threshold: node_renewal_threshold,
+        }
+    }
+}
 
 
+/// Status string for the compute node.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -2513,37 +4225,15 @@ impl ::std::str::FromStr for NodeStatusType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct NodeUpdateRequest {
-    /// Name of the node
-    #[serde(rename = "name")]
-    pub name: String,
-
-    /// Description of the node
-    #[serde(rename = "description")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub description: Option<String>,
-
-    /// IP Address of the node
-    #[serde(rename = "ipaddress")]
-    pub ipaddress: String,
-
-    #[serde(rename = "status")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub status: Option<models::NodeStatus>,
-
-    /// Intel SGX version running on the node
-    #[serde(rename = "sgx_version")]
-    pub sgx_version: String,
+    #[serde(rename = "patch")]
+    pub patch: Vec<models::PatchDocument>,
 
 }
 
 impl NodeUpdateRequest {
-    pub fn new(name: String, ipaddress: String, sgx_version: String, ) -> NodeUpdateRequest {
+    pub fn new(patch: Vec<models::PatchDocument>, ) -> NodeUpdateRequest {
         NodeUpdateRequest {
-            name: name,
-            description: None,
-            ipaddress: ipaddress,
-            status: None,
-            sgx_version: sgx_version,
+            patch: patch,
         }
     }
 }
@@ -2551,80 +4241,65 @@ impl NodeUpdateRequest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct OAuthInitiationRequest {
-    #[serde(rename = "provider")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub provider: Option<models::OAuthProviderType>,
+pub struct OauthAuthCodeGrant {
+    #[serde(rename = "name")]
+    pub name: String,
 
-    /// URI where Oauth provider will redirect to post authentication. If not given then redirects to /auth/callback
-    #[serde(rename = "callback_uri")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub callback_uri: Option<String>,
+    #[serde(rename = "icon_url")]
+    pub icon_url: String,
 
-}
+    #[serde(rename = "authorization_url")]
+    pub authorization_url: String,
 
-impl OAuthInitiationRequest {
-    pub fn new() -> OAuthInitiationRequest {
-        OAuthInitiationRequest {
-            provider: None,
-            callback_uri: None,
-        }
-    }
-}
+    #[serde(rename = "client_id")]
+    pub client_id: String,
 
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct OAuthInitiationResponse {
-    /// OAuth redirection URL
     #[serde(rename = "redirect_uri")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub redirect_uri: Option<String>,
+    pub redirect_uri: String,
 
-    /// OAuth state to be cached by client
     #[serde(rename = "state")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub state: Option<String>,
+    pub state: String,
+
+    #[serde(rename = "idp_id")]
+    pub idp_id: crate::ByteArray,
 
 }
 
-impl OAuthInitiationResponse {
-    pub fn new() -> OAuthInitiationResponse {
-        OAuthInitiationResponse {
-            redirect_uri: None,
-            state: None,
+impl OauthAuthCodeGrant {
+    pub fn new(name: String, icon_url: String, authorization_url: String, client_id: String, redirect_uri: String, state: String, idp_id: crate::ByteArray, ) -> OauthAuthCodeGrant {
+        OauthAuthCodeGrant {
+            name: name,
+            icon_url: icon_url,
+            authorization_url: authorization_url,
+            client_id: client_id,
+            redirect_uri: redirect_uri,
+            state: state,
+            idp_id: idp_id,
         }
     }
 }
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct OauthCodeData {
+    #[serde(rename = "idp_id")]
+    pub idp_id: crate::ByteArray,
 
+    #[serde(rename = "code")]
+    pub code: String,
 
+    #[serde(rename = "email")]
+    pub email: String,
 
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
-pub enum OAuthProviderType { 
-    #[serde(rename = "IBM-APPID")]
-    IBM_APPID,
 }
 
-impl ::std::fmt::Display for OAuthProviderType {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match *self { 
-            OAuthProviderType::IBM_APPID => write!(f, "{}", "IBM-APPID"),
-        }
-    }
-}
-
-impl ::std::str::FromStr for OAuthProviderType {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "IBM-APPID" => Ok(OAuthProviderType::IBM_APPID),
-            _ => Err(()),
+impl OauthCodeData {
+    pub fn new(idp_id: crate::ByteArray, code: String, email: String, ) -> OauthCodeData {
+        OauthCodeData {
+            idp_id: idp_id,
+            code: code,
+            email: email,
         }
     }
 }
@@ -2672,6 +4347,75 @@ impl PasswordResetRequest {
 }
 
 
+/// A JSONPatch document as defined by RFC 6902. The patch operation is subset of what is supported by RFC 6902.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct PatchDocument {
+    #[serde(rename = "op")]
+    pub op: models::PatchOperation,
+
+    /// It is JSON pointer indicating a field to be updated
+    #[serde(rename = "path")]
+    pub path: String,
+
+    /// It is the value to be used for the field as indicated by op and path
+    #[serde(rename = "value")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub value: Option<serde_json::Value>,
+
+}
+
+impl PatchDocument {
+    pub fn new(op: models::PatchOperation, path: String, ) -> PatchDocument {
+        PatchDocument {
+            op: op,
+            path: path,
+            value: None,
+        }
+    }
+}
+
+
+/// The operation to be performed
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
+#[allow(non_camel_case_types)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
+pub enum PatchOperation { 
+    #[serde(rename = "add")]
+    ADD,
+    #[serde(rename = "remove")]
+    REMOVE,
+    #[serde(rename = "replace")]
+    REPLACE,
+}
+
+impl ::std::fmt::Display for PatchOperation {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self { 
+            PatchOperation::ADD => write!(f, "{}", "add"),
+            PatchOperation::REMOVE => write!(f, "{}", "remove"),
+            PatchOperation::REPLACE => write!(f, "{}", "replace"),
+        }
+    }
+}
+
+impl ::std::str::FromStr for PatchOperation {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "add" => Ok(PatchOperation::ADD),
+            "remove" => Ok(PatchOperation::REMOVE),
+            "replace" => Ok(PatchOperation::REPLACE),
+            _ => Err(()),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ProcessInviteRequest {
@@ -2690,6 +4434,86 @@ impl ProcessInviteRequest {
         ProcessInviteRequest {
             accepts: None,
             rejects: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct RefreshResponse {
+    #[serde(rename = "session_info")]
+    pub session_info: models::SessionInfo,
+
+}
+
+impl RefreshResponse {
+    pub fn new(session_info: models::SessionInfo, ) -> RefreshResponse {
+        RefreshResponse {
+            session_info: session_info,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct Registry {
+    /// URL of the registry
+    #[serde(rename = "url")]
+    pub url: String,
+
+    /// UUID of the registry
+    #[serde(rename = "registry_id")]
+    pub registry_id: uuid::Uuid,
+
+    /// Description of the registry
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+    /// Username of the registry
+    #[serde(rename = "username")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub username: Option<String>,
+
+}
+
+impl Registry {
+    pub fn new(url: String, registry_id: uuid::Uuid, ) -> Registry {
+        Registry {
+            url: url,
+            registry_id: registry_id,
+            description: None,
+            username: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct RegistryRequest {
+    /// URL of the registry
+    #[serde(rename = "url")]
+    pub url: String,
+
+    #[serde(rename = "credential")]
+    pub credential: models::CredentialType,
+
+    /// Description of the registry
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+}
+
+impl RegistryRequest {
+    pub fn new(url: String, credential: models::CredentialType, ) -> RegistryRequest {
+        RegistryRequest {
+            url: url,
+            credential: credential,
+            description: None,
         }
     }
 }
@@ -2736,10 +4560,10 @@ impl RequesterInfo {
 }
 
 
-
-
-
-
+/// Type of requester
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -2776,7 +4600,51 @@ impl ::std::str::FromStr for RequesterType {
 }
 
 
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct RuntimeAppConfig {
+    #[serde(rename = "config")]
+    pub config: models::HashedConfig,
 
+    #[serde(rename = "extra")]
+    pub extra: models::ApplicationConfigExtra,
+
+}
+
+impl RuntimeAppConfig {
+    pub fn new(config: models::HashedConfig, extra: models::ApplicationConfigExtra, ) -> RuntimeAppConfig {
+        RuntimeAppConfig {
+            config: config,
+            extra: extra,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct SdkmsCredentials {
+    #[serde(rename = "credentials_url")]
+    pub credentials_url: String,
+
+    #[serde(rename = "credentials_key_name")]
+    pub credentials_key_name: String,
+
+}
+
+impl SdkmsCredentials {
+    pub fn new(credentials_url: String, credentials_key_name: String, ) -> SdkmsCredentials {
+        SdkmsCredentials {
+            credentials_url: credentials_url,
+            credentials_key_name: credentials_key_name,
+        }
+    }
+}
+
+
+/// Configures an SDKMS signing key. The key must be an RSA key with public exponent 3. 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct SdkmsSigningKeyConfig {
@@ -2809,19 +4677,19 @@ pub struct SearchMetadata {
     #[serde(rename = "page")]
     pub page: isize,
 
-    /// Total pages as per the item counts and page limit
+    /// Total pages as per the item counts and page limit.
     #[serde(rename = "pages")]
     pub pages: isize,
 
-    /// Number of items to limit in a page
+    /// Number of items to limit in a page.
     #[serde(rename = "limit")]
     pub limit: isize,
 
-    /// Total number of unfiltered items
+    /// Total number of unfiltered items.
     #[serde(rename = "total_count")]
     pub total_count: isize,
 
-    /// Total number of items as per the current filter
+    /// Total number of items as per the current filter.
     #[serde(rename = "filtered_count")]
     pub filtered_count: isize,
 
@@ -2840,11 +4708,55 @@ impl SearchMetadata {
 }
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct SelectAccountResponse {
+    #[serde(rename = "session_info")]
+    pub session_info: models::SessionInfo,
+
+}
+
+impl SelectAccountResponse {
+    pub fn new(session_info: models::SessionInfo, ) -> SelectAccountResponse {
+        SelectAccountResponse {
+            session_info: session_info,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct SessionInfo {
+    #[serde(rename = "subject_id")]
+    pub subject_id: uuid::Uuid,
+
+    /// Timestamp of when session will expire
+    #[serde(rename = "session_expires_at")]
+    pub session_expires_at: i64,
+
+    /// Timestamp of when session token will expire
+    #[serde(rename = "session_token_expires_at")]
+    pub session_token_expires_at: i64,
+
+}
+
+impl SessionInfo {
+    pub fn new(subject_id: uuid::Uuid, session_expires_at: i64, session_token_expires_at: i64, ) -> SessionInfo {
+        SessionInfo {
+            subject_id: subject_id,
+            session_expires_at: session_expires_at,
+            session_token_expires_at: session_token_expires_at,
+        }
+    }
+}
+
+
+/// SGX Related details of a compute node.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct SgxInfo {
-    /// Intel SGX version
+    /// Version of the Intel SGX Platform Software running on the compute node
     #[serde(rename = "version")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub version: Option<String>,
@@ -2860,7 +4772,7 @@ impl SgxInfo {
 }
 
 
-
+/// Configures a key to sign the converted image
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct SigningKeyConfig {
@@ -2904,6 +4816,10 @@ pub struct SignupRequest {
     #[serde(skip_serializing_if="Option::is_none")]
     pub last_name: Option<String>,
 
+    #[serde(rename = "recaptcha_response")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub recaptcha_response: Option<String>,
+
 }
 
 impl SignupRequest {
@@ -2913,6 +4829,7 @@ impl SignupRequest {
             user_password: user_password,
             first_name: None,
             last_name: None,
+            recaptcha_response: None,
         }
     }
 }
@@ -2981,12 +4898,12 @@ pub struct TaskResult {
     #[serde(skip_serializing_if="Option::is_none")]
     pub task_id: Option<uuid::Uuid>,
 
-    /// Certificate Id in case of certificate issuance task
+    /// Certificate Id in case of certificate issuance task.
     #[serde(rename = "certificate_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub certificate_id: Option<uuid::Uuid>,
 
-    /// Node Id
+    /// Compute Node Id
     #[serde(rename = "node_id")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub node_id: Option<uuid::Uuid>,
@@ -3020,7 +4937,7 @@ impl TaskResult {
 }
 
 
-
+/// Status info for a task.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct TaskStatus {
@@ -3028,7 +4945,7 @@ pub struct TaskStatus {
     #[serde(rename = "created_at")]
     pub created_at: i64,
 
-    /// Time since the status change
+    /// Time since the status change.
     #[serde(rename = "status_updated_at")]
     pub status_updated_at: i64,
 
@@ -3048,10 +4965,10 @@ impl TaskStatus {
 }
 
 
-
-
-
-
+/// Status string for a task.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -3092,10 +5009,10 @@ impl ::std::str::FromStr for TaskStatusType {
 }
 
 
-
-
-
-
+/// The types of tasks supported.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -3155,6 +5072,158 @@ impl TaskUpdateRequest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct TlsConfig {
+    #[serde(rename = "disabled")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub disabled: Option<serde_json::Value>,
+
+    #[serde(rename = "opportunistic")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub opportunistic: Option<serde_json::Value>,
+
+    #[serde(rename = "required")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub required: Option<models::TlsConfigRequired>,
+
+}
+
+impl TlsConfig {
+    pub fn new() -> TlsConfig {
+        TlsConfig {
+            disabled: None,
+            opportunistic: None,
+            required: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct TlsConfigRequired {
+    #[serde(rename = "validate_hostname")]
+    pub validate_hostname: bool,
+
+    #[serde(rename = "client_key")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub client_key: Option<crate::ByteArray>,
+
+    #[serde(rename = "client_cert")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub client_cert: Option<crate::ByteArray>,
+
+    #[serde(rename = "ca")]
+    pub ca: models::CaConfig,
+
+}
+
+impl TlsConfigRequired {
+    pub fn new(validate_hostname: bool, ca: models::CaConfig, ) -> TlsConfigRequired {
+        TlsConfigRequired {
+            validate_hostname: validate_hostname,
+            client_key: None,
+            client_cert: None,
+            ca: ca,
+        }
+    }
+}
+
+
+/// Update an application config.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct UpdateApplicationConfigRequest {
+    #[serde(rename = "name")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "ports")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub ports: Option<SortedVec<String>>,
+
+}
+
+impl UpdateApplicationConfigRequest {
+    pub fn new() -> UpdateApplicationConfigRequest {
+        UpdateApplicationConfigRequest {
+            name: None,
+            description: None,
+            ports: None,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct UpdateRegistryRequest(Vec<PatchDocument>);
+
+impl ::std::convert::From<Vec<PatchDocument>> for UpdateRegistryRequest {
+    fn from(x: Vec<PatchDocument>) -> Self {
+        UpdateRegistryRequest(x)
+    }
+}
+
+impl ::std::convert::From<UpdateRegistryRequest> for Vec<PatchDocument> {
+    fn from(x: UpdateRegistryRequest) -> Self {
+        x.0
+    }
+}
+
+impl ::std::iter::FromIterator<PatchDocument> for UpdateRegistryRequest {
+    fn from_iter<U: IntoIterator<Item=PatchDocument>>(u: U) -> Self {
+        UpdateRegistryRequest(Vec::<PatchDocument>::from_iter(u))
+    }
+}
+
+impl ::std::iter::IntoIterator for UpdateRegistryRequest {
+    type Item = PatchDocument;
+    type IntoIter = ::std::vec::IntoIter<PatchDocument>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> ::std::iter::IntoIterator for &'a UpdateRegistryRequest {
+    type Item = &'a PatchDocument;
+    type IntoIter = ::std::slice::Iter<'a, PatchDocument>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
+
+impl<'a> ::std::iter::IntoIterator for &'a mut UpdateRegistryRequest {
+    type Item = &'a mut PatchDocument;
+    type IntoIter = ::std::slice::IterMut<'a, PatchDocument>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&mut self.0).into_iter()
+    }
+}
+
+impl ::std::ops::Deref for UpdateRegistryRequest {
+    type Target = Vec<PatchDocument>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl ::std::ops::DerefMut for UpdateRegistryRequest {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct UpdateUserRequest {
     /// first name
     #[serde(rename = "first_name")]
@@ -3183,6 +5252,45 @@ impl UpdateUserRequest {
 }
 
 
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct UpdateWorkflowGraph {
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "version")]
+    pub version: isize,
+
+    #[serde(rename = "objects")]
+    pub objects: SortedHashMap<String, models::WorkflowObject>,
+
+    #[serde(rename = "edges")]
+    pub edges: SortedHashMap<String, models::WorkflowEdge>,
+
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::WorkflowMetadata>,
+
+}
+
+impl UpdateWorkflowGraph {
+    pub fn new(name: String, description: String, version: isize, objects: SortedHashMap<String, models::WorkflowObject>, edges: SortedHashMap<String, models::WorkflowEdge>, ) -> UpdateWorkflowGraph {
+        UpdateWorkflowGraph {
+            name: name,
+            description: description,
+            version: version,
+            objects: objects,
+            edges: edges,
+            metadata: None,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct User {
@@ -3204,12 +5312,12 @@ pub struct User {
     #[serde(rename = "user_email")]
     pub user_email: String,
 
-    /// Last login time of user
+    /// Last login time of user.
     #[serde(rename = "last_logged_in_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub last_logged_in_at: Option<i64>,
 
-    /// Creation time of user
+    /// Creation time of user.
     #[serde(rename = "created_at")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub created_at: Option<i64>,
@@ -3231,6 +5339,11 @@ pub struct User {
     #[serde(skip_serializing_if="Option::is_none")]
     pub user_account_status: Option<models::UserAccountStatus>,
 
+    /// Whether this user has accepted latest terms and conditions or not
+    #[serde(rename = "accepted_latest_terms_and_conditions")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub accepted_latest_terms_and_conditions: Option<bool>,
+
 }
 
 impl User {
@@ -3246,15 +5359,16 @@ impl User {
             status: None,
             roles: None,
             user_account_status: None,
+            accepted_latest_terms_and_conditions: None,
         }
     }
 }
 
 
-
-
-
-
+/// Status of an Account for a user.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -3291,28 +5405,10 @@ impl ::std::str::FromStr for UserAccountStatus {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct UserBlacklistRequest {
-    /// email of a user to be blacklisted
-    #[serde(rename = "email")]
-    pub email: String,
-
-}
-
-impl UserBlacklistRequest {
-    pub fn new(email: String, ) -> UserBlacklistRequest {
-        UserBlacklistRequest {
-            email: email,
-        }
-    }
-}
-
-
-
-
-
-
+/// Status of a user.
+/// Enumeration of values.
+/// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+/// which helps with FFI.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -3385,6 +5481,39 @@ impl ValidateTokenResponse {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct VersionInFinalWorkflow {
+    #[serde(rename = "graph_id")]
+    pub graph_id: uuid::Uuid,
+
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "version")]
+    pub version: String,
+
+    #[serde(rename = "contents")]
+    pub contents: models::FinalWorkflowGraph,
+
+}
+
+impl VersionInFinalWorkflow {
+    pub fn new(graph_id: uuid::Uuid, name: String, description: String, version: String, contents: models::FinalWorkflowGraph, ) -> VersionInFinalWorkflow {
+        VersionInFinalWorkflow {
+            graph_id: graph_id,
+            name: name,
+            description: description,
+            version: version,
+            contents: contents,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct VersionResponse {
     /// Manager Version
     #[serde(rename = "version")]
@@ -3402,7 +5531,334 @@ impl VersionResponse {
 }
 
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct VersionedZoneId {
+    #[serde(rename = "id")]
+    pub id: uuid::Uuid,
 
+    #[serde(rename = "version")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub version: Option<i64>,
+
+}
+
+impl VersionedZoneId {
+    pub fn new(id: uuid::Uuid, ) -> VersionedZoneId {
+        VersionedZoneId {
+            id: id,
+            version: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowEdge {
+    #[serde(rename = "source")]
+    pub source: models::WorkflowEdgeLink,
+
+    #[serde(rename = "target")]
+    pub target: models::WorkflowEdgeLink,
+
+}
+
+impl WorkflowEdge {
+    pub fn new(source: models::WorkflowEdgeLink, target: models::WorkflowEdgeLink, ) -> WorkflowEdge {
+        WorkflowEdge {
+            source: source,
+            target: target,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowEdgeLink {
+    #[serde(rename = "id")]
+    pub id: String,
+
+    #[serde(rename = "port")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub port: Option<String>,
+
+}
+
+impl WorkflowEdgeLink {
+    pub fn new(id: String, ) -> WorkflowEdgeLink {
+        WorkflowEdgeLink {
+            id: id,
+            port: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowGraph {
+    #[serde(rename = "graph_id")]
+    pub graph_id: uuid::Uuid,
+
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "creator_id")]
+    pub creator_id: uuid::Uuid,
+
+    /// Dataset creation time.
+    #[serde(rename = "created_at")]
+    pub created_at: i64,
+
+    /// Last update timestamp.
+    #[serde(rename = "updated_at")]
+    pub updated_at: i64,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "version")]
+    pub version: isize,
+
+    #[serde(rename = "objects")]
+    pub objects: SortedHashMap<String, models::WorkflowObject>,
+
+    #[serde(rename = "edges")]
+    pub edges: SortedHashMap<String, models::WorkflowEdge>,
+
+    #[serde(rename = "metadata")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub metadata: Option<models::WorkflowMetadata>,
+
+}
+
+impl WorkflowGraph {
+    pub fn new(graph_id: uuid::Uuid, name: String, creator_id: uuid::Uuid, created_at: i64, updated_at: i64, description: String, version: isize, objects: SortedHashMap<String, models::WorkflowObject>, edges: SortedHashMap<String, models::WorkflowEdge>, ) -> WorkflowGraph {
+        WorkflowGraph {
+            graph_id: graph_id,
+            name: name,
+            creator_id: creator_id,
+            created_at: created_at,
+            updated_at: updated_at,
+            description: description,
+            version: version,
+            objects: objects,
+            edges: edges,
+            metadata: None,
+        }
+    }
+}
+
+
+/// The final workflow from which this draft was derived. This field may point to a deleted final workflow in which you should treat it as if it's not present.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowLinkMetadata {
+    #[serde(rename = "graph_id")]
+    pub graph_id: uuid::Uuid,
+
+    #[serde(rename = "source_version")]
+    pub source_version: isize,
+
+}
+
+impl WorkflowLinkMetadata {
+    pub fn new(graph_id: uuid::Uuid, source_version: isize, ) -> WorkflowLinkMetadata {
+        WorkflowLinkMetadata {
+            graph_id: graph_id,
+            source_version: source_version,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowMetadata {
+    #[serde(rename = "nodes")]
+    pub nodes: HashMap<String, models::WorkflowNodeMetadata>,
+
+    #[serde(rename = "parent")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub parent: Option<models::WorkflowLinkMetadata>,
+
+}
+
+impl WorkflowMetadata {
+    pub fn new(nodes: HashMap<String, models::WorkflowNodeMetadata>, ) -> WorkflowMetadata {
+        WorkflowMetadata {
+            nodes: nodes,
+            parent: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowNodeMetadata {
+    #[serde(rename = "position")]
+    pub position: models::WorkflowNodePositionMetadata,
+
+}
+
+impl WorkflowNodeMetadata {
+    pub fn new(position: models::WorkflowNodePositionMetadata, ) -> WorkflowNodeMetadata {
+        WorkflowNodeMetadata {
+            position: position,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowNodePositionMetadata {
+    #[serde(rename = "x")]
+    pub x: isize,
+
+    #[serde(rename = "y")]
+    pub y: isize,
+
+}
+
+impl WorkflowNodePositionMetadata {
+    pub fn new(x: isize, y: isize, ) -> WorkflowNodePositionMetadata {
+        WorkflowNodePositionMetadata {
+            x: x,
+            y: y,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowObject {
+    #[serde(rename = "name")]
+    pub name: String,
+
+    #[serde(rename = "user_id")]
+    pub user_id: uuid::Uuid,
+
+    #[serde(rename = "description")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "ref")]
+    pub _ref: models::WorkflowObjectRef,
+
+}
+
+impl WorkflowObject {
+    pub fn new(name: String, user_id: uuid::Uuid, _ref: models::WorkflowObjectRef, ) -> WorkflowObject {
+        WorkflowObject {
+            name: name,
+            user_id: user_id,
+            description: None,
+            _ref: _ref,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowObjectRef {
+    #[serde(rename = "placeholder")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub placeholder: Option<models::WorkflowObjectRefPlaceholder>,
+
+    #[serde(rename = "dataset")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub dataset: Option<models::WorkflowObjectRefDataset>,
+
+    #[serde(rename = "app")]
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub app: Option<models::WorkflowObjectRefApp>,
+
+}
+
+impl WorkflowObjectRef {
+    pub fn new() -> WorkflowObjectRef {
+        WorkflowObjectRef {
+            placeholder: None,
+            dataset: None,
+            app: None,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowObjectRefApp {
+    #[serde(rename = "image_id")]
+    pub image_id: uuid::Uuid,
+
+    #[serde(rename = "config_id")]
+    pub config_id: String,
+
+}
+
+impl WorkflowObjectRefApp {
+    pub fn new(image_id: uuid::Uuid, config_id: String, ) -> WorkflowObjectRefApp {
+        WorkflowObjectRefApp {
+            image_id: image_id,
+            config_id: config_id,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowObjectRefDataset {
+    #[serde(rename = "dataset_id")]
+    pub dataset_id: uuid::Uuid,
+
+}
+
+impl WorkflowObjectRefDataset {
+    pub fn new(dataset_id: uuid::Uuid, ) -> WorkflowObjectRefDataset {
+        WorkflowObjectRefDataset {
+            dataset_id: dataset_id,
+        }
+    }
+}
+
+
+/// 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+pub struct WorkflowObjectRefPlaceholder {
+    // Note: inline enums are not fully supported by openapi-generator
+    #[serde(rename = "kind")]
+    pub kind: String,
+
+}
+
+impl WorkflowObjectRefPlaceholder {
+    pub fn new(kind: String, ) -> WorkflowObjectRefPlaceholder {
+        WorkflowObjectRefPlaceholder {
+            kind: kind,
+        }
+    }
+}
+
+
+/// Detailed info of a zone.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct Zone {
@@ -3410,7 +5866,7 @@ pub struct Zone {
     #[serde(rename = "acct_id")]
     pub acct_id: uuid::Uuid,
 
-    /// Zone Certificate
+    /// Zone certificate (PEM format)
     #[serde(rename = "certificate")]
     pub certificate: String,
 
@@ -3427,16 +5883,26 @@ pub struct Zone {
     #[serde(skip_serializing_if="Option::is_none")]
     pub description: Option<String>,
 
+    /// Interval between node agent checkins with the backend, in seconds
+    #[serde(rename = "node_refresh_interval")]
+    pub node_refresh_interval: i64,
+
+    /// The node agent requests certificate renewal when the certificate's remaining validity is less than this percentage of the original validity
+    #[serde(rename = "node_renewal_threshold")]
+    pub node_renewal_threshold: i32,
+
 }
 
 impl Zone {
-    pub fn new(acct_id: uuid::Uuid, certificate: String, zone_id: uuid::Uuid, name: String, ) -> Zone {
+    pub fn new(acct_id: uuid::Uuid, certificate: String, zone_id: uuid::Uuid, name: String, node_refresh_interval: i64, node_renewal_threshold: i32, ) -> Zone {
         Zone {
             acct_id: acct_id,
             certificate: certificate,
             zone_id: zone_id,
             name: name,
             description: None,
+            node_refresh_interval: node_refresh_interval,
+            node_renewal_threshold: node_renewal_threshold,
         }
     }
 }
@@ -3445,7 +5911,7 @@ impl Zone {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ZoneJoinToken {
-    /// Bearer token used to enroll compute nodes
+    /// Bearer token used to enroll compute nodes.
     #[serde(rename = "token")]
     #[serde(skip_serializing_if="Option::is_none")]
     pub token: Option<String>,
