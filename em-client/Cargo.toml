@@ -2,7 +2,7 @@
 
 [package]
 name = "em-client"
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Fortanix Inc."]
 license = "MPL-2.0"
 description = "This crate provides rust bindings for Enclave Manager API."
@@ -14,6 +14,7 @@ client = ["serde_ignored", "hyper", "url"]
 
 [dependencies]
 base64 = "0.10"
+bitflags = "1.2"
 chrono = { version = "0.4", features = ["serde"] }
 futures = "0.1"
 lazy_static = "1.0"
