@@ -3880,39 +3880,6 @@ pub mod base64_format {
 }
 pub use base64_format::ByteArray;
 
-pub mod auth {
-    #![allow(non_upper_case_globals)]
-
-    // These are camel case to match their capitalization in the spec.
-
-    bitflags! {
-        pub struct AuthResource: u32 {
-            const NoAuth          = 0x1;
-            const Reader          = 0x2;
-            const Writer          = 0x4;
-            const Manager         = 0x8;
-            const AgentAuth       = 0x10;
-            const ClusterPeerAuth = 0x20;
-            const AdminIfAuth     = 0x40;
-            const UserAuth        = 0x80;
-            const JoinTokenAuth   = 0x100;
-            const AppAuth         = 0x200;
-            const ApprovalAuth    = 0x400;
-        }
-    }
-
-    /// The default value of an AuthResource is NoAuth, which is the AuthResource value required by unauthenticated
-    /// APIs. We require this value, rather then the empty value, for such APIs, as a safety feature for detecting
-    /// missing authentication specifications. That is, an API operation must explicitly specify that it is NoAuth,
-    /// rather than leaving out the x-auth-resource specification.
-    ///
-    /// On the authenticator's side, this means that the NoAuth flag should be set on each request, and additional
-    /// flags should be added to it, as applicable for the authentication value(s) carried with the request.
-    impl Default for AuthResource {
-        fn default() -> Self { AuthResource::NoAuth }
-    }
-}
-
 /// Very simple error type - just holds a description of the error. This is useful for human
 /// diagnosis and troubleshooting, but not for applications to parse. The justification for this
 /// is to deny applications visibility into the communication layer, forcing the application code
