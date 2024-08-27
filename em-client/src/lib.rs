@@ -27,6 +27,7 @@ extern crate serde_json;
 extern crate futures;
 extern crate chrono;
 extern crate uuid;
+extern crate mbedtls;
 
 use futures::Stream;
 use std::error;
@@ -2661,6 +2662,9 @@ pub trait ApplicationConfigApi {
 
     /// Get app config
     fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, Self::Error>;
+
+    /// Get checked app config
+    fn get_checked_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error>;
 
     /// Get details of a particular runtime app config.
     fn get_specific_runtime_application_config(&self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error>;

@@ -57,6 +57,7 @@ use {
 };
 
 use models;
+use mbedtls::hash;
 
 define_encode_set! {
     /// This encode set is used for object IDs
@@ -182,6 +183,62 @@ impl Client {
 
     pub fn headers(&mut self) -> &mut Headers {
         &mut self.headers
+    }
+
+    fn get_runtime_application_config_raw(&self) -> Result<String, ApiError> {
+        let mut url = format!(
+            "{}/v1/runtime/app_configs",
+            self.base_path
+        );
+
+        let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
+
+        let query_string_str = query_string.finish();
+        if !query_string_str.is_empty() {
+            url += "?";
+            url += &query_string_str;
+        }
+
+        let url = match Url::from_str(&url) {
+            Ok(url) => url,
+            Err(err) => return Err(ApiError::new(format!("Unable to build URL: {}", err), SimpleErrorType::Permanent)),
+        };
+
+        let mut request = self.hyper_client.request(Method::Get, url);
+        request = request.headers(self.headers.clone());
+
+        request.send()
+            .map_err(|e| ApiError::new(format!("No response received: {}", e), SimpleErrorType::Permanent))
+            .and_then(|mut response| {
+                match response.status.to_u16() {
+                    200 => {
+                        let mut body = Vec::new();
+                        response.read_to_end(&mut body)
+                            .map_err(|e| ApiError::new(format!("Failed to read response: {}", e), SimpleErrorType::Temporary))?;
+                        String::from_utf8(body)
+                            .map_err(|e| ApiError::new(format!("Response was not valid UTF8: {}", e), SimpleErrorType::Temporary))
+                    },
+                    code => {
+                        let headers = response.headers.clone();
+                        let mut body = Vec::new();
+                        let result = response.read_to_end(&mut body);
+                        let err_type = match response.status.is_server_error() {
+                            false => SimpleErrorType::Permanent,
+                            true => SimpleErrorType::Temporary,
+                        };
+                        Err(ApiError::new(format!("Unexpected response code {}:\n{:?}\n\n{}",
+                                                  code,
+                                                  headers,
+                                                  match result {
+                                                      Ok(_) => match str::from_utf8(&body) {
+                                                          Ok(body) => Cow::from(body),
+                                                          Err(e) => Cow::from(format!("<Body was not UTF8: {:?}>", e)),
+                                                      },
+                                                      Err(e) => Cow::from(format!("<Failed to read body: {}>", e)),
+                                                  }), err_type))
+                    }
+                }
+            })
     }
 }
 
@@ -1348,65 +1405,27 @@ impl ApplicationConfigApi for Client {
 
     }
 
-    fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, ApiError> {
-        let mut url = format!(
-            "{}/v1/runtime/app_configs",
-            self.base_path
-        );
+    fn get_checked_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
+        let raw_config = self.get_runtime_application_config_raw()?;
+        let mut hash = vec![0; 32];
+        hash::Md::hash(mbedtls::hash::Type::Sha256,
+                                  raw_config.as_bytes(), &mut hash)
+            .map_err(|e| ApiError::new(format!("Unable to hash app config: {}", e), SimpleErrorType::Permanent))?;
 
-        let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
-
-        let query_string_str = query_string.finish();
-        if !query_string_str.is_empty() {
-            url += "?";
-            url += &query_string_str;
+        if hash != expected_hash {
+            Err(ApiError::new(format!("App config hash mismatch."), SimpleErrorType::Permanent))
+        } else {
+            serde_json::from_str::<models::RuntimeAppConfig>(&raw_config)
+                .map_err(|e| e.into())
         }
+    }
 
-        let url = match Url::from_str(&url) {
-            Ok(url) => url,
-            Err(err) => return Err(ApiError::new(format!("Unable to build URL: {}", err), SimpleErrorType::Permanent)),
-        };
-
-        let mut request = self.hyper_client.request(Method::Get, url);
-        request = request.headers(self.headers.clone());
-
-        request.send()
-            .map_err(|e| ApiError::new(format!("No response received: {}", e), SimpleErrorType::Permanent))
-            .and_then(|mut response| {
-                match response.status.to_u16() {
-                    200 => {
-                        let mut body = Vec::new();
-                        response.read_to_end(&mut body)
-                            .map_err(|e| ApiError::new(format!("Failed to read response: {}", e), SimpleErrorType::Temporary))?;
-                        str::from_utf8(&body)
-                            .map_err(|e| ApiError::new(format!("Response was not valid UTF8: {}", e), SimpleErrorType::Temporary))
-                            .and_then(|body| {
-                                 serde_json::from_str::<models::RuntimeAppConfig>(body)
-                                         .map_err(|e| e.into())
-                            })
-                    },
-                    code => {
-                        let headers = response.headers.clone();
-                        let mut body = Vec::new();
-                        let result = response.read_to_end(&mut body);
-                        let err_type = match response.status.is_server_error() {
-                            false => SimpleErrorType::Permanent,
-                            true => SimpleErrorType::Temporary,
-                        };
-                        Err(ApiError::new(format!("Unexpected response code {}:\n{:?}\n\n{}",
-                            code,
-                            headers,
-                            match result {
-                                Ok(_) => match str::from_utf8(&body) {
-                                    Ok(body) => Cow::from(body),
-                                    Err(e) => Cow::from(format!("<Body was not UTF8: {:?}>", e)),
-                                },
-                                Err(e) => Cow::from(format!("<Failed to read body: {}>", e)),
-                            }), err_type))
-                    }
-                }
+    fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, ApiError> {
+        self.get_runtime_application_config_raw()
+            .and_then(|body| {
+            serde_json::from_str::<models::RuntimeAppConfig>(&body)
+                .map_err(|e| e.into())
         })
-
     }
 
     fn get_specific_runtime_application_config(&self, param_config_id: String) -> Result<models::RuntimeAppConfig, ApiError> {

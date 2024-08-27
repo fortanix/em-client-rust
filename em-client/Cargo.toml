@@ -27,6 +27,7 @@ uuid = {version = "0.6", features = ["serde", "v4"]}
 hyper = {version = "0.10", default-features = false, optional = true}
 serde_ignored = {version = "0.0.4", optional = true}
 url = {version = "1.5", optional = true}
+mbedtls = { version = "0.9" }
 
 [dev-dependencies]
 clap = "2.25"
