@@ -862,7 +862,7 @@ impl ApplicationConfigConnectionDataset {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ApplicationConfigContents {
     #[serde(rename = "contents")]
@@ -919,7 +919,7 @@ impl ApplicationConfigExtra {
 
 
 /// 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ApplicationConfigPort {
     #[serde(rename = "dataset")]
@@ -929,7 +929,7 @@ pub struct ApplicationConfigPort {
     /// 
     #[serde(rename = "application")]
     #[serde(skip_serializing_if="Option::is_none")]
-    pub application: Option<String>,
+    pub application: Option<serde_json::Value>,
 
 }
 
@@ -944,7 +944,7 @@ impl ApplicationConfigPort {
 
 
 /// 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ApplicationConfigPortDataset {
     #[serde(rename = "id")]
@@ -1039,7 +1039,7 @@ impl ApplicationConfigSdkmsCredentials {
 
 
 /// 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct ApplicationConfigWorkflow {
     #[serde(rename = "workflow_id")]
@@ -3631,7 +3631,7 @@ impl GetPckCertResponse {
 
 
 /// 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct HashedConfig {
     #[serde(rename = "app_config")]
