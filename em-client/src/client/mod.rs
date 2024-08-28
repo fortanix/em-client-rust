@@ -1405,7 +1405,7 @@ impl ApplicationConfigApi for Client {
 
     }
 
-    fn get_checked_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
+    fn get_checked_runtime_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
         let raw_config = self.get_runtime_application_config_raw()?;
         let mut hash = vec![0; 32];
         hash::Md::hash(mbedtls::hash::Type::Sha256,
