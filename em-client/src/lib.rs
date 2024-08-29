@@ -132,9 +132,6 @@ pub trait Api {
     /// Get app config
     fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, Self::Error>;
 
-    /// Get checked app config
-    fn get_checked_runtime_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error>;
-
     /// Get details of a particular runtime app config.
     fn get_specific_runtime_application_config(&self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error>;
 
@@ -463,9 +460,6 @@ pub trait ApiMut {
 
     /// Get app config
     fn get_runtime_application_config(&mut self) -> Result<models::RuntimeAppConfig, Self::Error>;
-
-    /// Get checked app config
-    fn get_checked_runtime_application_config(&mut self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error>;
 
     /// Get details of a particular runtime app config.
     fn get_specific_runtime_application_config(&mut self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error>;
@@ -840,10 +834,6 @@ where
     
         fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, Self::Error> {
             ApplicationConfigApi::get_runtime_application_config(self.0, )
-        }
-
-        fn get_checked_runtime_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
-            ApplicationConfigApi::get_checked_runtime_application_config(self.0, expected_hash, )
         }
     
         fn get_specific_runtime_application_config(&self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error> {
@@ -1273,11 +1263,7 @@ where
         fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, Self::Error> {
             self.dispatch(|a| Api::get_runtime_application_config(a, ))
         }
-
-        fn get_checked_runtime_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
-            self.dispatch(|a| Api::get_checked_runtime_application_config(a, expected_hash, ))
-        }
-
+    
         fn get_specific_runtime_application_config(&self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error> {
             self.dispatch(|a| Api::get_specific_runtime_application_config(a, config_id, ))
         }
@@ -1706,10 +1692,6 @@ where
         self.get_runtime_application_config()
     }
 
-    fn get_checked_runtime_application_config(&mut self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
-        self.get_checked_runtime_application_config(expected_hash)
-    }
-
     fn get_specific_runtime_application_config(&mut self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error> {
         self.get_specific_runtime_application_config(config_id, )
     }
@@ -2134,10 +2116,6 @@ where
 
     fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, Self::Error> {
         self.borrow_mut().get_runtime_application_config()
-    }
-
-    fn get_checked_runtime_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
-        self.borrow_mut().get_checked_runtime_application_config(expected_hash, )
     }
 
     fn get_specific_runtime_application_config(&self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error> {
@@ -2686,7 +2664,7 @@ pub trait ApplicationConfigApi {
     fn get_runtime_application_config(&self) -> Result<models::RuntimeAppConfig, Self::Error>;
 
     /// Get checked app config
-    fn get_checked_runtime_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error>;
+    fn get_checked_application_config(&self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error>;
 
     /// Get details of a particular runtime app config.
     fn get_specific_runtime_application_config(&self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error>;
@@ -2714,9 +2692,6 @@ pub trait ApplicationConfigApiMut {
 
     /// Get app config
     fn get_runtime_application_config(&mut self) -> Result<models::RuntimeAppConfig, Self::Error>;
-
-    /// Get checked app config
-    fn get_checked_runtime_application_config(&mut self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error>;
 
     /// Get details of a particular runtime app config.
     fn get_specific_runtime_application_config(&mut self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error>;
@@ -2752,10 +2727,6 @@ where
 
     fn get_runtime_application_config(&mut self) -> Result<models::RuntimeAppConfig, Self::Error> {
         <T as ApplicationConfigApi>::get_runtime_application_config(self, )
-    }
-
-    fn get_checked_runtime_application_config(&mut self, expected_hash: Vec<u8>) -> Result<models::RuntimeAppConfig, Self::Error> {
-        <T as ApplicationConfigApi>::get_checked_runtime_application_config(self, expected_hash)
     }
 
     fn get_specific_runtime_application_config(&mut self, config_id: String) -> Result<models::RuntimeAppConfig, Self::Error> {
