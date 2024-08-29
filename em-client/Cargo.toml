@@ -2,7 +2,7 @@
 
 [package]
 name = "em-client"
-version = "3.1.0"
+version = "4.0.0"
 authors = ["Fortanix Inc."]
 license = "MPL-2.0"
 description = "This crate provides rust bindings for Enclave Manager API."
