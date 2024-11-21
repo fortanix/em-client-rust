@@ -1410,7 +1410,7 @@ impl ApplicationConfigApi for Client {
             .map_err(|e| ApiError::new(format!("Unable to hash app config: {}", e), SimpleErrorType::Permanent))?;
 
         if hash != expected_hash {
-            Err(ApiError::new("App config hash mismatch.".to_string(), SimpleErrorType::Permanent))
+            Err(ApiError::new(format!("App config hash mismatch. Expected {:?}, but got {:?}", hash, expected_hash).to_string(), SimpleErrorType::Permanent))
         } else {
             serde_json::from_str::<models::RuntimeAppConfig>(&raw_config)
                 .map_err(|e| e.into())
