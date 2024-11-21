@@ -1404,16 +1404,24 @@ impl ApplicationConfigApi for Client {
                 }
             })?;
 
+        let result = serde_json::from_str::<models::RuntimeAppConfig>(&raw_config)
+            .expect(&format!("Failed to serialize FULL app config to json."));
+
+        let hashed_config_part = serde_json::to_string(&result.config)
+            .expect(&format!("Failed to serialize app config to json."));
+
         let mut hash = vec![0; 32];
         hash::Md::hash(mbedtls::hash::Type::Sha256,
-                       raw_config.as_bytes(), &mut hash)
+                       hashed_config_part.as_bytes(), &mut hash)
             .map_err(|e| ApiError::new(format!("Unable to hash app config: {}", e), SimpleErrorType::Permanent))?;
 
+        let json = serde_json::to_string(&result)
+            .expect(&format!("Failed to serialize app config to json"));
+
         if hash != expected_hash {
-            Err(ApiError::new(format!("App config hash mismatch. Expected {:?}, but got {:?}", hash, expected_hash).to_string(), SimpleErrorType::Permanent))
+            Err(ApiError::new(format!("App config hash mismatch. Expected {:?}, but got {:?}. Raw App config is {}. Json is {}", hash, expected_hash, raw_config, json).to_string(), SimpleErrorType::Permanent))
         } else {
-            serde_json::from_str::<models::RuntimeAppConfig>(&raw_config)
-                .map_err(|e| e.into())
+            Ok(result)
         }
     }
 
