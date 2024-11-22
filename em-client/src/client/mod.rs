@@ -1419,7 +1419,7 @@ impl ApplicationConfigApi for Client {
             .expect(&format!("Failed to serialize app config to json"));
 
         if hash != expected_hash {
-            Err(ApiError::new(format!("App config hash mismatch. Expected {:?}, but got {:?}. Raw App config is {}. Json is {}", hash, expected_hash, raw_config, json).to_string(), SimpleErrorType::Permanent))
+            Err(ApiError::new(format!("App config hash mismatch. Expected {:?}, but got {:?}. Raw App config is {}. Hashed part is {}", hash, expected_hash, raw_config, hashed_config_part).to_string(), SimpleErrorType::Permanent))
         } else {
             Ok(result)
         }
