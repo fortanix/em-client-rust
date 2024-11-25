@@ -6525,10 +6525,10 @@ impl error::Error for ClientInitError {
 
 fn deserialize_config_checked(raw_config: &str, expected_hash: &[u8; 32]) -> Result<models::RuntimeAppConfig, ApiError> {
     let result = serde_json::from_str::<models::RuntimeAppConfig>(&raw_config)
-        .expect(&format!("Failed to serialize FULL app config to json."));
+        .map_err(|e| ApiError::new(format!("Failed to serialize RuntimeAppConfig to json: {}", e), SimpleErrorType::Permanent))?;
 
     let hashed_config_part = serde_json::to_string(&result.config)
-        .expect(&format!("Failed to serialize app config to json."));
+        .map_err(|e| ApiError::new(format!("Failed to serialize HashedConfig to json: {}", e), SimpleErrorType::Permanent))?;
 
     let hash = compute_sha256(hashed_config_part.as_bytes())
         .map_err(|e| ApiError::new(format!("Unable to hash app config: {}", e), SimpleErrorType::Permanent))?;
@@ -6599,7 +6599,7 @@ mod tests {
     }
 
     #[test]
-    fn test_valid_hash2_fails() {
+    fn test_valid_hash_additional_fields_in_workflow() {
         let json_data = r#"{"config":{"app_config":{"TestKey":{"contents":"U29tZXRoaW5nIG9mIHZhbHVl"}},"labels":{},"zone_ca":["-----BEGIN CERTIFICATE-----\nMIIFGDCCA4CgAwIBAgIUbOw7KSJs9E1tYTVl0Y5UxZjnoXwwDQYJKoZIhvcNAQEL\nBQAwgZIxNTAzBgsrBgEEAYOEGgEDAQwkYzUyMzJjOTYtMjliYy00Yzg5LWFmY2Qt\nZWU4ZTc3MmRmNTEzMTUwMwYLKwYBBAGDhBoBAwIMJDA1YjJkY2FlLWI5MjktNDg2\nNy05ZDI0LWZjMTRmYzJhM2UwZTEiMCAGA1UEAwwZRGVmYXVsdCBFbmNsYXZlIFpv\nbmUgUm9vdDAeFw0yNDEwMTQxMDIyMjNaFw0yOTEwMTQxMDIyMjNaMIGSMTUwMwYL\nKwYBBAGDhBoBAwEMJGM1MjMyYzk2LTI5YmMtNGM4OS1hZmNkLWVlOGU3NzJkZjUx\nMzE1MDMGCysGAQQBg4QaAQMCDCQwNWIyZGNhZS1iOTI5LTQ4NjctOWQyNC1mYzE0\nZmMyYTNlMGUxIjAgBgNVBAMMGURlZmF1bHQgRW5jbGF2ZSBab25lIFJvb3QwggGi\nMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQDbiPKi09IKYVN507z8l2hpWs92\nkFwhfxwtp2m4wL61AGNwjJKYj+sX7cUsxZn3mq3RFtBM5DHH//6Fk70nXdfST+jG\n2F1GXQXqnicLeqnFTvtPQW/tR4GqnpG5ck1vz99xmWDacgfYkcNImU2r8naojCUs\nOR6mnOiOAOHrVIscNhuyhbIS8wlYeXjXKUbt4xBMZSzQXM4/sG4PvPdfnov8GUUY\nZwv31roMZBMq28nuuD2FcHi+jnwNwBztX3SggsIBtqREEVtAyomXnIuGu3wzNvH7\nqnNFJb+WyAwtyfATK1QFgpIiwr/sttEc7SWSGrAJE1eJrda657o6pxEWMRUCNy01\nZgsseJQlRLoCrgbklpjmqny4w7kpN6u2lQ0whfU+0Y4PWhgpSzgqZsEnJ17/vs41\nX3Xm5stSlNftFMmJa4ugBjOgsKmcJnokmBlhV6UHP4r24Zxw8qhXHd6Ve6sFyE0/\nl4ix4VjRWGFms3XgPNwAYF2AQB+82ezS/XY7lO0CAwEAAaNkMGIwDwYDVR0TAQH/\nBAUwAwEB/zAPBgNVHQ8BAf8EBQMDB4YAMB8GA1UdIwQYMBaAFKYkCG35BodJnsGO\nsn8rLERR/gZ5MB0GA1UdDgQWBBSmJAht+QaHSZ7BjrJ/KyxEUf4GeTANBgkqhkiG\n9w0BAQsFAAOCAYEAEkwQiDoeWZSKg1juQWVH7ND7ynbMQWWii4Gzf7ljpA6WjTCC\nl4ZBfi1uzn5vQlLR6Hvtxt+RNPupolCmShPmi07Ykmch4K+vgX374HVJxyb4s39U\n1IpIwucNxgtKATU+uPQ92yL0bf5K6RmOjr3tKslOTicWk1LBoclVqfqubeMAF3Ir\nz3uPlbSFSWuEGmkGUS6VqpGfzzCVpztecOzQ3wMLMrd3/luugn0GzoKAjy5gAiIS\nFqTC6xeYMy6YSlOioPqxsOckPOtpwtXI5cvTWdcqGq+tAxejAYmFj02Ct4MbljKg\n1RDjE/wMYz9EdJY6qfIL3ygst4wDCqHTrBsCRpU4kkfo9EoY2aqYwx1DBH0iobVB\nl1iKSjY777mhIMMuFl9+nOP+uuj1VF9chbkkH6s/eLBOKS5mPCr5IzJ2fGGCWRJ5\nTLNdNknTwF9RjiQfnFes1dwn5U5CG1b0lVPekeK8XmLgrxLKSaSyufCtWiDuGnSw\nl9PSKFeq622R9rXy\n-----END CERTIFICATE-----\n"],"workflow":{"workflow_id":"daf9b79a-1519-43ac-a519-08ea32840894","app_name":"stlw0qv3t","port_map":{},"app_acct_id":"c5232c96-29bc-4c89-afcd-ee8e772df513","app_group_id":"5ce01a15-4c14-479c-834f-1ddd485dfeb2"}},"extra":{"connections":{}}}"#;
 
         let expected_hash = Sha256Hash::try_from("c79839b310ca6c8ab281d05a3f3e9ebeddb4aa3f669c2c302110dead30894ce9").unwrap();

@@ -1051,14 +1051,20 @@ pub struct ApplicationConfigWorkflow {
     #[serde(rename = "port_map")]
     pub port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_acct_id: Option<uuid::Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_group_id: Option<uuid::Uuid>,
 }
 
 impl ApplicationConfigWorkflow {
-    pub fn new(workflow_id: uuid::Uuid, app_name: String, port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>, ) -> ApplicationConfigWorkflow {
+    pub fn new(workflow_id: uuid::Uuid, app_name: String, port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>, app_acct_id: Option<uuid::Uuid>, app_group_id: Option<uuid::Uuid>) -> ApplicationConfigWorkflow {
         ApplicationConfigWorkflow {
             workflow_id: workflow_id,
             app_name: app_name,
             port_map: port_map,
+            app_acct_id,
+            app_group_id
         }
     }
 }
