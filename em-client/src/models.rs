@@ -921,45 +921,50 @@ impl ApplicationConfigExtra {
 /// 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
-pub struct ApplicationConfigPort {
+#[serde(deny_unknown_fields)]
+pub enum ApplicationConfigPort {
     #[serde(rename = "dataset")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub dataset: Option<models::ApplicationConfigPortDataset>,
+    Dataset(ApplicationConfigPortDataset),
 
-    /// 
     #[serde(rename = "application")]
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub application: Option<serde_json::Value>,
-
+    Application(ApplicationPort),
 }
 
-impl ApplicationConfigPort {
-    pub fn new() -> ApplicationConfigPort {
-        ApplicationConfigPort {
-            dataset: None,
-            application: None,
-        }
-    }
-}
-
-
-/// 
+///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+#[serde(deny_unknown_fields)]
 pub struct ApplicationConfigPortDataset {
     #[serde(rename = "id")]
     pub id: uuid::Uuid,
 
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub acct_id: Option<uuid::Uuid>,
+
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub group_id: Option<uuid::Uuid>,
+
 }
 
 impl ApplicationConfigPortDataset {
-    pub fn new(id: uuid::Uuid, ) -> ApplicationConfigPortDataset {
+    pub fn new(id: uuid::Uuid, acct_id: Option<uuid::Uuid>, group_id: Option<uuid::Uuid>) -> ApplicationConfigPortDataset {
         ApplicationConfigPortDataset {
             id: id,
+            acct_id,
+            group_id
         }
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ApplicationPort {
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub acct_id: Option<uuid::Uuid>,
+
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub group_id: Option<uuid::Uuid>,
+}
 
 /// 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1041,6 +1046,7 @@ impl ApplicationConfigSdkmsCredentials {
 /// 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+#[serde(deny_unknown_fields)]
 pub struct ApplicationConfigWorkflow {
     #[serde(rename = "workflow_id")]
     pub workflow_id: uuid::Uuid,
@@ -1051,14 +1057,20 @@ pub struct ApplicationConfigWorkflow {
     #[serde(rename = "port_map")]
     pub port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_acct_id: Option<uuid::Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_group_id: Option<uuid::Uuid>,
 }
 
 impl ApplicationConfigWorkflow {
-    pub fn new(workflow_id: uuid::Uuid, app_name: String, port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>, ) -> ApplicationConfigWorkflow {
+    pub fn new(workflow_id: uuid::Uuid, app_name: String, port_map: SortedHashMap<String, SortedHashMap<String, models::ApplicationConfigPort>>, app_acct_id: Option<uuid::Uuid>, app_group_id: Option<uuid::Uuid>) -> ApplicationConfigWorkflow {
         ApplicationConfigWorkflow {
             workflow_id: workflow_id,
             app_name: app_name,
             port_map: port_map,
+            app_acct_id,
+            app_group_id
         }
     }
 }
@@ -3633,6 +3645,7 @@ impl GetPckCertResponse {
 /// 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+#[serde(deny_unknown_fields)]
 pub struct HashedConfig {
     #[serde(rename = "app_config")]
     pub app_config: SortedHashMap<String, models::ApplicationConfigContents>,
@@ -3648,6 +3661,8 @@ pub struct HashedConfig {
     pub workflow: Option<models::ApplicationConfigWorkflow>,
 
 }
+
+
 
 impl HashedConfig {
     pub fn new(app_config: SortedHashMap<String, models::ApplicationConfigContents>, labels: SortedHashMap<String, String>, zone_ca: SortedVec<String>, ) -> HashedConfig {
@@ -5926,3 +5941,34 @@ impl ZoneJoinToken {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use models;
+
+    #[test]
+    fn test_deny_unknown_fields_should_work() {
+        let json_data = r#"{"app_config":{},"labels":{},"zone_ca":[],"workflow":null,"UNKNOWN_FIELD":{}}"#;
+        let result = serde_json::from_str::<models::HashedConfig>(&json_data);
+        assert!(result.is_err());
+
+        let json_data = r#"{"UNKNOWN_FIELD":{},"workflow_id":"00000000-0000-0000-0000-000000000000","app_name":"","port_map":{},"app_acct_id":null,"app_group_id":null}"#;
+        let result = serde_json::from_str::<models::ApplicationConfigWorkflow>(&json_data);
+        assert!(result.is_err());
+
+        let json_data = r#"{"UNKNOWN_FIELD":{},"acct_id":null,"group_id":null}"#;
+        let result = serde_json::from_str::<models::ApplicationPort>(&json_data);
+        assert!(result.is_err());
+
+        let json_data = r#"{"UNKNOWN_FIELD":{},"id":"00000000-0000-0000-0000-000000000000","acct_id":null,"group_id":null}"#;
+        let result = serde_json::from_str::<models::ApplicationConfigPortDataset>(&json_data);
+        assert!(result.is_err());
+
+        let json_data = r#"{"UNKNOWN_FIELD":{},"id":"00000000-0000-0000-0000-000000000000","acct_id":null,"group_id":null}"#;
+        let result = serde_json::from_str::<models::ApplicationConfigPortDataset>(&json_data);
+        assert!(result.is_err());
+
+        let json_data = r#"{"UNKNOWN_VARIANT":{"id":"00000000-0000-0000-0000-000000000000","acct_id":null,"group_id":null}}"#;
+        let result = serde_json::from_str::<models::ApplicationConfigPort>(&json_data);
+        assert!(result.is_err());
+    }
+}

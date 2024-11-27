@@ -59,6 +59,11 @@ use {
 use models;
 use mbedtls::hash;
 
+// https://en.wikipedia.org/wiki/SHA-2
+const SHA256_BYTE_LENGTH: usize = 32;
+
+const SHA256_CHAR_LENGTH: usize = SHA256_BYTE_LENGTH * 2;
+
 define_encode_set! {
     /// This encode set is used for object IDs
     ///
@@ -1404,17 +1409,8 @@ impl ApplicationConfigApi for Client {
                 }
             })?;
 
-        let mut hash = vec![0; 32];
-        hash::Md::hash(mbedtls::hash::Type::Sha256,
-                       raw_config.as_bytes(), &mut hash)
-            .map_err(|e| ApiError::new(format!("Unable to hash app config: {}", e), SimpleErrorType::Permanent))?;
 
-        if hash != expected_hash {
-            Err(ApiError::new("App config hash mismatch.".to_string(), SimpleErrorType::Permanent))
-        } else {
-            serde_json::from_str::<models::RuntimeAppConfig>(&raw_config)
-                .map_err(|e| e.into())
-        }
+        deserialize_config_checked(&raw_config, expected_hash)
     }
 
     fn get_specific_runtime_application_config(&self, param_config_id: String) -> Result<models::RuntimeAppConfig, ApiError> {
@@ -6529,5 +6525,99 @@ impl fmt::Display for ClientInitError {
 impl error::Error for ClientInitError {
     fn description(&self) -> &str {
         "Failed to produce a hyper client."
+    }
+}
+
+fn deserialize_config_checked(raw_config: &str, expected_hash: &[u8; SHA256_BYTE_LENGTH]) -> Result<models::RuntimeAppConfig, ApiError> {
+    let result = serde_json::from_str::<models::RuntimeAppConfig>(&raw_config)
+        .map_err(|e| ApiError::new(format!("Failed to serialize RuntimeAppConfig to json: {}", e), SimpleErrorType::Permanent))?;
+
+    let hashed_config_part = serde_json::to_string(&result.config)
+        .map_err(|e| ApiError::new(format!("Failed to serialize HashedConfig to json: {}", e), SimpleErrorType::Permanent))?;
+
+    let hash = compute_sha256(hashed_config_part.as_bytes())
+        .map_err(|e| ApiError::new(format!("Unable to hash app config: {}", e), SimpleErrorType::Permanent))?;
+
+    if hash != *expected_hash {
+        Err(ApiError::new(format!("App config hash mismatch. Expected {:?}, but got {:?}.", hash, expected_hash).to_string(), SimpleErrorType::Permanent))
+    } else {
+        Ok(result)
+    }
+}
+
+fn compute_sha256(input: &[u8]) -> Result<[u8; SHA256_BYTE_LENGTH], ApiError> {
+    use mbedtls::hash::{Md, Type};
+    let mut digest = [0; SHA256_BYTE_LENGTH];
+    Md::hash(Type::Sha256, input, &mut digest)
+        .map_err(|e| ApiError::new(format!("Unable to hash app config: {}", e), SimpleErrorType::Permanent))?;
+
+    Ok(digest)
+}
+
+#[cfg(test)]
+mod tests {
+    use client::deserialize_config_checked;
+    use std::convert::{From, TryFrom};
+
+    use client::{SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH};
+
+    #[derive(Debug)]
+    pub struct Sha256Hash([u8; SHA256_BYTE_LENGTH]);
+
+    impl TryFrom<&str> for Sha256Hash {
+        type Error = String;
+
+        fn try_from(value: &str) -> Result<Self, Self::Error> {
+            if value.len() != SHA256_CHAR_LENGTH {
+                return Err(format!("SHA-256 string should be exactly {} characters long, instead got a string of len {}", SHA256_CHAR_LENGTH, value.len()))
+            } else if !(value.chars().all(|c| c.is_ascii_hexdigit())) {
+                return Err(format!("SHA-256 string should contain only hexadecimal characters in the format [0-9a-fA-F], but got {}", value))
+            } else {
+                let mut result = [0u8; SHA256_BYTE_LENGTH];
+
+                for i in 0..SHA256_BYTE_LENGTH {
+                    // We iterate input string by chunks of 2 because 1 hex char is half a byte.
+                    let chunk = &value[2 * i..2 * i + 2];
+                    result[i] = u8::from_str_radix(chunk, 16).map_err(|err| {
+                        format!(
+                            "Invalid hex format for chunk '{}' at position {}. Error {:?}",
+                            chunk, i, err
+                        )
+                    })?;
+                }
+
+                Ok(Sha256Hash(result))
+            }
+        }
+    }
+
+    #[test]
+    fn test_valid_hash() {
+        let json_data = r#"{"config":{"app_config":{"/opt/fortanix/enclave-os/app-config/rw/harmonize.txt":{"contents":"WyB7ICJiZWZvcmUiOiAiTGl2aW5nIiwgImFmdGVyIjogIkhhcHB5IiB9LCB7ICJiZWZvcmUiOiAiRGVjZWFzZWQiLCAiYWZ0ZXIiOiAiVW5oYXBweSIgfV0="}},"labels":{"location":"East US"},"zone_ca":["-----BEGIN CERTIFICATE-----\nMIIFGDCCA4CgAwIBAgIUHQCD590cMmMiUisayBBbQOdCKNUwDQYJKoZIhvcNAQEL\nBQAwgZIxNTAzBgsrBgEEAYOEGgEDAQwkZTMzNThjYjQtNWY2ZS00ZDFjLWFkN2Mt\nZGFmODc0ZGNmNzc4MTUwMwYLKwYBBAGDhBoBAwIMJGI3ZTMxMDQ3LThmZmYtNDdh\nMi05ODY1LWJjZjQwYmRmYjdlMjEiMCAGA1UEAwwZRGVmYXVsdCBFbmNsYXZlIFpv\nbmUgUm9vdDAeFw0yNDExMTkxMTU3NTFaFw0yOTExMTkxMTU3NTFaMIGSMTUwMwYL\nKwYBBAGDhBoBAwEMJGUzMzU4Y2I0LTVmNmUtNGQxYy1hZDdjLWRhZjg3NGRjZjc3\nODE1MDMGCysGAQQBg4QaAQMCDCRiN2UzMTA0Ny04ZmZmLTQ3YTItOTg2NS1iY2Y0\nMGJkZmI3ZTIxIjAgBgNVBAMMGURlZmF1bHQgRW5jbGF2ZSBab25lIFJvb3QwggGi\nMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQDFTQXxYCihCZNPmBOL83peXl8N\nX4z5xx6PYpMkPaDLffKYidSYx8BeYlq7J/fB074NmuoL/ArygWRCdTfylWPnIyvx\n9kWQEdiK5EW0p1+mtgXdV4H61b+QjE5Jrtp7liZE/fKMGRMpvd8Gx4WkZwDyZo2n\nhc5mimULHNFTm1fE+gwUcg2b9z95n6NA3XAx/2AROkaYWka5wq2D6qU+Lo+ZRaNM\neccovOQH/7VZUxvMTVpFZLiccqJjHpFJ4O+0648HzLLaefiFGYMuEhfUN8To6JuU\ns6pY3j0UbYciBaOsWRZk4KjxLBkKJd3YqFkdExAu4yGuw7qoEZWpJ2gOu04evPBr\n5fhnH7X65ndYv2bJqtCcGjuVlICtsgP1K/zjd5WtpFAUpJCeGZFKdk/iT2ehRKnX\nnMLM0rrZWCbgSooB/Mo8omZNwe3PUDQ0CBiIKjWCn6tXnGTjER7uyp2C1LcloqBZ\nKK1XS6pTUMqkYRZGbhK+oBAJstV7hyEDonpC0skCAwEAAaNkMGIwDwYDVR0TAQH/\nBAUwAwEB/zAPBgNVHQ8BAf8EBQMDB4YAMB8GA1UdIwQYMBaAFGCJitDjMB1j9w4w\nKSl4zomn0EsYMB0GA1UdDgQWBBRgiYrQ4zAdY/cOMCkpeM6Jp9BLGDANBgkqhkiG\n9w0BAQsFAAOCAYEAUhz55qRSdC57EMq+JpKveT38rlcPYyhpVVL7kWTyHnKZjUAa\nQ9bPDGvq3yAQwLnI9DUyjpAzJPqJVP/ZFM633RrTtqNYEykatvYH0tgWhRcCyIE2\nZuqp8vqukzwdcCpZmNDrKM+XYk6Y/XoMNgF7nkiaDyFBRti4F6CzPk+St5xO1cpW\nz0vDWX+TbaZpj/iP8DI5XfIfEVG1P15A/zg5z5YObCPmslZYDeG3j7D2cUF9QvwT\nKs+MZUYXSIKCYDwPsHF+wo9lEh+2qbczY4Pno0SjamyrbZh6nUQ4aFVA2+6L+Pom\nQKtoA+VxXkD4yayhkAEK9GLxXFknnerC09IEs9FePl2WW8TzSLH2orBT/W/+1762\nn+MUiMgkb/r/CULaPCP6kmlceLCRUhdVogInSGV7R7RGyCUZNx30Foy2EFDsC4zs\nCsKQ2rkYDYXKyJovnr8pTlKMLczlvBsDztwlVhsKHKd+qLz1G0fFBqOmI0ktXQnt\nzVHIOmasuRWcoVXl\n-----END CERTIFICATE-----\n"],"workflow":{"workflow_id":"93156096-5ed4-41ad-ae23-19e8fab1e0af","app_name":"app-1","port_map":{"input":{"input-1":{"dataset":{"id":"141c73d4-36f2-4185-bc75-40e2f7f4f235"}}},"output":{"output-1":{"dataset":{"id":"d63b3d7d-72a1-466d-8df2-8e18f3d647ea"}}}}}},"extra":{"connections":{}}}"#;
+
+        let expected_hash = Sha256Hash::try_from("0d0374f1f982570abcbe0c687deb54a708d56744ff4b5356810352d9ec8ae495").unwrap();
+        let result = deserialize_config_checked(json_data, &expected_hash.0);
+
+        assert!(result.is_ok())
+    }
+
+    #[test]
+    fn test_valid_hash_additional_fields_in_workflow() {
+        let json_data = r#"{"config":{"app_config":{"TestKey":{"contents":"U29tZXRoaW5nIG9mIHZhbHVl"}},"labels":{},"zone_ca":["-----BEGIN CERTIFICATE-----\nMIIFGDCCA4CgAwIBAgIUbOw7KSJs9E1tYTVl0Y5UxZjnoXwwDQYJKoZIhvcNAQEL\nBQAwgZIxNTAzBgsrBgEEAYOEGgEDAQwkYzUyMzJjOTYtMjliYy00Yzg5LWFmY2Qt\nZWU4ZTc3MmRmNTEzMTUwMwYLKwYBBAGDhBoBAwIMJDA1YjJkY2FlLWI5MjktNDg2\nNy05ZDI0LWZjMTRmYzJhM2UwZTEiMCAGA1UEAwwZRGVmYXVsdCBFbmNsYXZlIFpv\nbmUgUm9vdDAeFw0yNDEwMTQxMDIyMjNaFw0yOTEwMTQxMDIyMjNaMIGSMTUwMwYL\nKwYBBAGDhBoBAwEMJGM1MjMyYzk2LTI5YmMtNGM4OS1hZmNkLWVlOGU3NzJkZjUx\nMzE1MDMGCysGAQQBg4QaAQMCDCQwNWIyZGNhZS1iOTI5LTQ4NjctOWQyNC1mYzE0\nZmMyYTNlMGUxIjAgBgNVBAMMGURlZmF1bHQgRW5jbGF2ZSBab25lIFJvb3QwggGi\nMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQDbiPKi09IKYVN507z8l2hpWs92\nkFwhfxwtp2m4wL61AGNwjJKYj+sX7cUsxZn3mq3RFtBM5DHH//6Fk70nXdfST+jG\n2F1GXQXqnicLeqnFTvtPQW/tR4GqnpG5ck1vz99xmWDacgfYkcNImU2r8naojCUs\nOR6mnOiOAOHrVIscNhuyhbIS8wlYeXjXKUbt4xBMZSzQXM4/sG4PvPdfnov8GUUY\nZwv31roMZBMq28nuuD2FcHi+jnwNwBztX3SggsIBtqREEVtAyomXnIuGu3wzNvH7\nqnNFJb+WyAwtyfATK1QFgpIiwr/sttEc7SWSGrAJE1eJrda657o6pxEWMRUCNy01\nZgsseJQlRLoCrgbklpjmqny4w7kpN6u2lQ0whfU+0Y4PWhgpSzgqZsEnJ17/vs41\nX3Xm5stSlNftFMmJa4ugBjOgsKmcJnokmBlhV6UHP4r24Zxw8qhXHd6Ve6sFyE0/\nl4ix4VjRWGFms3XgPNwAYF2AQB+82ezS/XY7lO0CAwEAAaNkMGIwDwYDVR0TAQH/\nBAUwAwEB/zAPBgNVHQ8BAf8EBQMDB4YAMB8GA1UdIwQYMBaAFKYkCG35BodJnsGO\nsn8rLERR/gZ5MB0GA1UdDgQWBBSmJAht+QaHSZ7BjrJ/KyxEUf4GeTANBgkqhkiG\n9w0BAQsFAAOCAYEAEkwQiDoeWZSKg1juQWVH7ND7ynbMQWWii4Gzf7ljpA6WjTCC\nl4ZBfi1uzn5vQlLR6Hvtxt+RNPupolCmShPmi07Ykmch4K+vgX374HVJxyb4s39U\n1IpIwucNxgtKATU+uPQ92yL0bf5K6RmOjr3tKslOTicWk1LBoclVqfqubeMAF3Ir\nz3uPlbSFSWuEGmkGUS6VqpGfzzCVpztecOzQ3wMLMrd3/luugn0GzoKAjy5gAiIS\nFqTC6xeYMy6YSlOioPqxsOckPOtpwtXI5cvTWdcqGq+tAxejAYmFj02Ct4MbljKg\n1RDjE/wMYz9EdJY6qfIL3ygst4wDCqHTrBsCRpU4kkfo9EoY2aqYwx1DBH0iobVB\nl1iKSjY777mhIMMuFl9+nOP+uuj1VF9chbkkH6s/eLBOKS5mPCr5IzJ2fGGCWRJ5\nTLNdNknTwF9RjiQfnFes1dwn5U5CG1b0lVPekeK8XmLgrxLKSaSyufCtWiDuGnSw\nl9PSKFeq622R9rXy\n-----END CERTIFICATE-----\n"],"workflow":{"workflow_id":"daf9b79a-1519-43ac-a519-08ea32840894","app_name":"stlw0qv3t","port_map":{},"app_acct_id":"c5232c96-29bc-4c89-afcd-ee8e772df513","app_group_id":"5ce01a15-4c14-479c-834f-1ddd485dfeb2"}},"extra":{"connections":{}}}"#;
+
+        let expected_hash = Sha256Hash::try_from("c79839b310ca6c8ab281d05a3f3e9ebeddb4aa3f669c2c302110dead30894ce9").unwrap();
+        let result = deserialize_config_checked(json_data, &expected_hash.0);
+
+        assert!(result.is_ok())
+    }
+
+    #[test]
+    fn test_valid_hash_with_application() {
+        let json_data = r#"{"config":{"app_config":{},"labels":{"Um4J7P5P":"WSKsYIJs","autoshutdown":"True","location":"East US"},"zone_ca":["-----BEGIN CERTIFICATE-----\nMIIFGDCCA4CgAwIBAgIUbOw7KSJs9E1tYTVl0Y5UxZjnoXwwDQYJKoZIhvcNAQEL\nBQAwgZIxNTAzBgsrBgEEAYOEGgEDAQwkYzUyMzJjOTYtMjliYy00Yzg5LWFmY2Qt\nZWU4ZTc3MmRmNTEzMTUwMwYLKwYBBAGDhBoBAwIMJDA1YjJkY2FlLWI5MjktNDg2\nNy05ZDI0LWZjMTRmYzJhM2UwZTEiMCAGA1UEAwwZRGVmYXVsdCBFbmNsYXZlIFpv\nbmUgUm9vdDAeFw0yNDEwMTQxMDIyMjNaFw0yOTEwMTQxMDIyMjNaMIGSMTUwMwYL\nKwYBBAGDhBoBAwEMJGM1MjMyYzk2LTI5YmMtNGM4OS1hZmNkLWVlOGU3NzJkZjUx\nMzE1MDMGCysGAQQBg4QaAQMCDCQwNWIyZGNhZS1iOTI5LTQ4NjctOWQyNC1mYzE0\nZmMyYTNlMGUxIjAgBgNVBAMMGURlZmF1bHQgRW5jbGF2ZSBab25lIFJvb3QwggGi\nMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQDbiPKi09IKYVN507z8l2hpWs92\nkFwhfxwtp2m4wL61AGNwjJKYj+sX7cUsxZn3mq3RFtBM5DHH//6Fk70nXdfST+jG\n2F1GXQXqnicLeqnFTvtPQW/tR4GqnpG5ck1vz99xmWDacgfYkcNImU2r8naojCUs\nOR6mnOiOAOHrVIscNhuyhbIS8wlYeXjXKUbt4xBMZSzQXM4/sG4PvPdfnov8GUUY\nZwv31roMZBMq28nuuD2FcHi+jnwNwBztX3SggsIBtqREEVtAyomXnIuGu3wzNvH7\nqnNFJb+WyAwtyfATK1QFgpIiwr/sttEc7SWSGrAJE1eJrda657o6pxEWMRUCNy01\nZgsseJQlRLoCrgbklpjmqny4w7kpN6u2lQ0whfU+0Y4PWhgpSzgqZsEnJ17/vs41\nX3Xm5stSlNftFMmJa4ugBjOgsKmcJnokmBlhV6UHP4r24Zxw8qhXHd6Ve6sFyE0/\nl4ix4VjRWGFms3XgPNwAYF2AQB+82ezS/XY7lO0CAwEAAaNkMGIwDwYDVR0TAQH/\nBAUwAwEB/zAPBgNVHQ8BAf8EBQMDB4YAMB8GA1UdIwQYMBaAFKYkCG35BodJnsGO\nsn8rLERR/gZ5MB0GA1UdDgQWBBSmJAht+QaHSZ7BjrJ/KyxEUf4GeTANBgkqhkiG\n9w0BAQsFAAOCAYEAEkwQiDoeWZSKg1juQWVH7ND7ynbMQWWii4Gzf7ljpA6WjTCC\nl4ZBfi1uzn5vQlLR6Hvtxt+RNPupolCmShPmi07Ykmch4K+vgX374HVJxyb4s39U\n1IpIwucNxgtKATU+uPQ92yL0bf5K6RmOjr3tKslOTicWk1LBoclVqfqubeMAF3Ir\nz3uPlbSFSWuEGmkGUS6VqpGfzzCVpztecOzQ3wMLMrd3/luugn0GzoKAjy5gAiIS\nFqTC6xeYMy6YSlOioPqxsOckPOtpwtXI5cvTWdcqGq+tAxejAYmFj02Ct4MbljKg\n1RDjE/wMYz9EdJY6qfIL3ygst4wDCqHTrBsCRpU4kkfo9EoY2aqYwx1DBH0iobVB\nl1iKSjY777mhIMMuFl9+nOP+uuj1VF9chbkkH6s/eLBOKS5mPCr5IzJ2fGGCWRJ5\nTLNdNknTwF9RjiQfnFes1dwn5U5CG1b0lVPekeK8XmLgrxLKSaSyufCtWiDuGnSw\nl9PSKFeq622R9rXy\n-----END CERTIFICATE-----\n"],"workflow":{"workflow_id":"c375e923-1390-4440-b9e6-ad9977557e5e","app_name":"chncthgm6","port_map":{"input":{"vZq7oNK9":{"application":{"acct_id":"c5232c96-29bc-4c89-afcd-ee8e772df513","group_id":"5ce01a15-4c14-479c-834f-1ddd485dfeb2"}}}},"app_acct_id":"c5232c96-29bc-4c89-afcd-ee8e772df513","app_group_id":"5ce01a15-4c14-479c-834f-1ddd485dfeb2"}},"extra":{"connections":{"input":{"vZq7oNK9":{"application":{"workflow_domain":"vZq7oNK9.c375e923-1390-4440-b9e6-ad9977557e5e.workflow.fortanix.cloud"}}}}}}"#;
+
+        let expected_hash = Sha256Hash::try_from("43fd2e42e40365622fa81d3a3037b6ae130b552dc5f026d8c4168f89c7ff20c8").unwrap();
+        let result = deserialize_config_checked(json_data, &expected_hash.0);
+
+        assert!(result.is_ok())
     }
 }
