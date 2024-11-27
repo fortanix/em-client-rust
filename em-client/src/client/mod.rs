@@ -6613,6 +6613,8 @@ mod tests {
 
     #[test]
     fn test_valid_hash_with_data_sets() {
+        // A modified version of RuntimeAppConfig with included datasets and sanitized personal data.
+        // The expected hash in this case comes from running 'sha256sum` utility over the json.
         let json_data = r#"{"config":{"app_config":{},"labels":{"autoshutdown":"True","location":"East US","mxK4gaGv":"lLI6hgIA"},"zone_ca":["Certificate"],"workflow":{"workflow_id":"c375e923-1390-4440-b9e6-ad9977557e5e","app_name":"vZq7oNK9","port_map":{"input":{"2RAsgVoI":{"dataset":{"id":"e97447d5-6e1f-4cc8-9a56-cf4502f9ddd0","acct_id":"c5232c96-29bc-4c89-afcd-ee8e772df513","group_id":"5ce01a15-4c14-479c-834f-1ddd485dfeb2"}}},"output":{"bZbrS5DR":{"dataset":{"id":"0e7af6ec-4268-40ec-b341-cd17037dfb25","acct_id":"c5232c96-29bc-4c89-afcd-ee8e772df513","group_id":"5ce01a15-4c14-479c-834f-1ddd485dfeb2"}}}},"app_acct_id":"c5232c96-29bc-4c89-afcd-ee8e772df513","app_group_id":"5ce01a15-4c14-479c-834f-1ddd485dfeb2"}},"extra":{"connections":{"input":{"2RAsgVoI":{"dataset":{"location":"some-location","credentials":{"sdkms":{"credentials_url":"some-url","credentials_key_name":"some-key","sdkms_app_id":"0b73608a-0e2c-42e5-ba12-64f13e165120"}}}}},"output":{"bZbrS5DR":{"dataset":{"location":"some-location","credentials":{"sdkms":{"credentials_url":"some-url","credentials_key_name":"some-key","sdkms_app_id":"0b73608a-0e2c-42e5-ba12-64f13e165120"}}}}}}}}"#;
         let expected_hash = Sha256Hash::try_from("2f4886ff1efa09773e3b656fb5b9a31d0439fdeecbe12d61a6767651466cbbc4").unwrap();
         let result = deserialize_config_checked(json_data, &expected_hash.0);
