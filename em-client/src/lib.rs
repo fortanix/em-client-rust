@@ -4001,7 +4001,7 @@ impl ::std::fmt::Display for ErrorType {
 }
 
 /// Describes SHA256 hash sum in byte format
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Sha256Hash([u8; SHA256_BYTE_LENGTH]);
 
 impl TryFrom<&str> for Sha256Hash {
@@ -4036,5 +4036,54 @@ impl Deref for Sha256Hash {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use SHA256_BYTE_LENGTH;
+    use Sha256Hash;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_valid_sha256_hash() {
+        let valid_sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        let hash = Sha256Hash::try_from(valid_sha256);
+
+        assert!(hash.is_ok());
+        let hash = hash.unwrap();
+        assert_eq!(hash.0.len(), SHA256_BYTE_LENGTH);
+        assert_eq!(
+            hash.0,
+            [
+                0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f,
+                0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b,
+                0x78, 0x52, 0xb8, 0x55
+            ]
+        );
+    }
+
+    #[test]
+    fn test_invalid_length_sha256_hash() {
+        let invalid_sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852"; // 62 characters
+        let hash = Sha256Hash::try_from(invalid_sha256);
+
+        assert!(hash.is_err());
+    }
+
+    #[test]
+    fn test_invalid_hex_sha256_hash() {
+        let invalid_sha256 = "X3b0c44298Lc1c149afbf4c8996fb92427XX41e4649b934WW495991b7852Y855";
+        let hash = Sha256Hash::try_from(invalid_sha256);
+
+        assert!(hash.is_err());
+    }
+
+    #[test]
+    fn test_empty_sha256_hash() {
+        let empty_sha256 = "";
+        let hash = Sha256Hash::try_from(empty_sha256);
+
+        assert!(hash.is_err());
     }
 }
