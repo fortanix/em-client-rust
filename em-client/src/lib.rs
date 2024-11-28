@@ -46,6 +46,11 @@ pub use futures::Future;
 pub const BASE_PATH: &'static str = "/v1";
 pub const API_VERSION: &'static str = "2.0.0";
 
+// https://en.wikipedia.org/wiki/SHA-2
+const SHA256_BYTE_LENGTH: usize = 32;
+
+const SHA256_CHAR_LENGTH: usize = SHA256_BYTE_LENGTH * 2;
+
 // Need to restore enum generation for multi-response request types
 
 /// Trait for decorating an implementation of the API with common
@@ -3880,6 +3885,7 @@ pub mod base64_format {
     }
 }
 pub use base64_format::ByteArray;
+use std::convert::TryFrom;
 
 /// Very simple error type - just holds a description of the error. This is useful for human
 /// diagnosis and troubleshooting, but not for applications to parse. The justification for this
@@ -3989,6 +3995,37 @@ impl ::std::fmt::Display for ErrorType {
             ErrorType::NotFound => write!(f, "{}", "NotFound"),
             ErrorType::MethodNotAllowed => write!(f, "{}", "MethodNotAllowed"),
             ErrorType::InvalidHeader => write!(f, "{}", "InvalidHeader"),
+        }
+    }
+}
+
+/// Describes SHA256 hash sum in byte format
+#[derive(Debug)]
+pub struct Sha256Hash([u8; SHA256_BYTE_LENGTH]);
+
+impl TryFrom<&str> for Sha256Hash {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value.len() != SHA256_CHAR_LENGTH {
+            return Err(format!("SHA-256 string should be exactly {} characters long, instead got a string of len {}", SHA256_CHAR_LENGTH, value.len()))
+        } else if !(value.chars().all(|c| c.is_ascii_hexdigit())) {
+            return Err(format!("SHA-256 string should contain only hexadecimal characters in the format [0-9a-fA-F], but got {}", value))
+        } else {
+            let mut result = [0u8; SHA256_BYTE_LENGTH];
+
+            for i in 0..SHA256_BYTE_LENGTH {
+                // We iterate input string by chunks of 2 because 1 hex char is half a byte.
+                let chunk = &value[2 * i..2 * i + 2];
+                result[i] = u8::from_str_radix(chunk, 16).map_err(|err| {
+                    format!(
+                        "Invalid hex format for chunk '{}' at position {}. Error {:?}",
+                        chunk, i, err
+                    )
+                })?;
+            }
+
+            Ok(Sha256Hash(result))
         }
     }
 }
