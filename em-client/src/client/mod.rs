@@ -9,7 +9,7 @@ extern crate chrono;
 extern crate url;
 extern crate uuid;
 
-use ::{hyper, SHA256_BYTE_LENGTH};
+use ::{SHA256_BYTE_LENGTH};
 use hyper::client::{Request, Response};
 use hyper::header::{Header, Headers, HeaderFormat, ContentType};
 use hyper::method::Method;
