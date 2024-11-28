@@ -32,6 +32,8 @@ extern crate mbedtls;
 use futures::Stream;
 use std::error;
 use std::fmt;
+use std::ops::Deref;
+use std::convert::TryFrom;
 use std::io::Error;
 
 #[allow(unused_imports)]
@@ -3885,7 +3887,6 @@ pub mod base64_format {
     }
 }
 pub use base64_format::ByteArray;
-use std::convert::TryFrom;
 
 /// Very simple error type - just holds a description of the error. This is useful for human
 /// diagnosis and troubleshooting, but not for applications to parse. The justification for this
@@ -4027,5 +4028,13 @@ impl TryFrom<&str> for Sha256Hash {
 
             Ok(Sha256Hash(result))
         }
+    }
+}
+
+impl Deref for Sha256Hash {
+    type Target = [u8; SHA256_BYTE_LENGTH];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
