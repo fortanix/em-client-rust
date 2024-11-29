@@ -9,7 +9,7 @@ extern crate chrono;
 extern crate url;
 extern crate uuid;
 
-use hyper;
+use ::{SHA256_BYTE_LENGTH};
 use hyper::client::{Request, Response};
 use hyper::header::{Header, Headers, HeaderFormat, ContentType};
 use hyper::method::Method;
@@ -58,11 +58,6 @@ use {
 
 use models;
 use mbedtls::hash;
-
-// https://en.wikipedia.org/wiki/SHA-2
-const SHA256_BYTE_LENGTH: usize = 32;
-
-const SHA256_CHAR_LENGTH: usize = SHA256_BYTE_LENGTH * 2;
 
 define_encode_set! {
     /// This encode set is used for object IDs
@@ -6558,38 +6553,7 @@ fn compute_sha256(input: &[u8]) -> Result<[u8; SHA256_BYTE_LENGTH], ApiError> {
 mod tests {
     use client::deserialize_config_checked;
     use std::convert::{From, TryFrom};
-
-    use client::{SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH};
-
-    #[derive(Debug)]
-    pub struct Sha256Hash([u8; SHA256_BYTE_LENGTH]);
-
-    impl TryFrom<&str> for Sha256Hash {
-        type Error = String;
-
-        fn try_from(value: &str) -> Result<Self, Self::Error> {
-            if value.len() != SHA256_CHAR_LENGTH {
-                return Err(format!("SHA-256 string should be exactly {} characters long, instead got a string of len {}", SHA256_CHAR_LENGTH, value.len()))
-            } else if !(value.chars().all(|c| c.is_ascii_hexdigit())) {
-                return Err(format!("SHA-256 string should contain only hexadecimal characters in the format [0-9a-fA-F], but got {}", value))
-            } else {
-                let mut result = [0u8; SHA256_BYTE_LENGTH];
-
-                for i in 0..SHA256_BYTE_LENGTH {
-                    // We iterate input string by chunks of 2 because 1 hex char is half a byte.
-                    let chunk = &value[2 * i..2 * i + 2];
-                    result[i] = u8::from_str_radix(chunk, 16).map_err(|err| {
-                        format!(
-                            "Invalid hex format for chunk '{}' at position {}. Error {:?}",
-                            chunk, i, err
-                        )
-                    })?;
-                }
-
-                Ok(Sha256Hash(result))
-            }
-        }
-    }
+    use crate::{SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH, Sha256Hash};
 
     #[test]
     fn test_valid_hash() {
