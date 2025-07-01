@@ -1,0 +1,85 @@
+name: em-client-rust
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - master
+  merge_group:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: 10
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: Build+test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # test a bunch of toolchains on ubuntu
+        rust:
+          - stable
+          - nightly
+        os: [ubuntu-24.04]
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.rust }}-${{ matrix.os }}
+
+      - name: Install ${{ matrix.rust }} toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: cargo build (debug; default features)
+        run: cargo build --locked --workspace
+
+      - name: cargo test (debug; default features)
+        run: cargo test --locked --workspace
+
+      - name: cargo test (debug; all features)
+        if: ${{ matrix.os != 'macos-latest' }}
+        run: cargo test --locked --all-features --workspace
+
+      - name: cargo test (debug; no default features)
+        run: cargo test --locked --no-default-features --workspace
+
+  semver:
+    name: Check semver compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
