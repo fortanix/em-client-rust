@@ -12,9 +12,9 @@ clap = "2.2.5"                                   # MIT
 crypto-hash = "0.3"                              # MIT
 lazy_static = "1"
 serde_bytes = "0.10"
-hyper-native-tls = "0.2"
+hyper-native-tls = "0.3"
 serde_json = "1.0"
-native-tls = "0.1.5"
+native-tls = "0.2.11"
 sgx-isa = { version = "0.3" }
 hyper = { version = "0.10", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
