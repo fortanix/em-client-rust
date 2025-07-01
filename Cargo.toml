@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "em-cli",
+  "em-client",
+  "em-node-agent-client",
+]
+resolver = "2"
