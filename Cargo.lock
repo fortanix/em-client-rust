@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "em-client"
-version = "4.0.0"
+version = "4.0.1"
 dependencies = [
  "base64 0.10.1",
  "bitflags 1.3.2",
@@ -645,9 +645,9 @@ checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 
 [[package]]
 name = "mbedtls"
-version = "0.12.5"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85518d7740ddc73c8d4d07b1be49a73ab2f4b7658f05ee266bf1827c2b8e801a"
+checksum = "8b8114ab6c15889057a80479744eeb891e090ed2dd0258f13a7ef8ef02848293"
 dependencies = [
  "bitflags 1.3.2",
  "byteorder",
