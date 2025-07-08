@@ -332,7 +332,7 @@ dependencies = [
  "mime",
  "serde",
  "serde_derive",
- "serde_ignored",
+ "serde_ignored 0.0.4",
  "serde_json",
  "url",
  "uuid",
@@ -355,7 +355,7 @@ dependencies = [
  "mime",
  "serde",
  "serde_derive",
- "serde_ignored",
+ "serde_ignored 0.1.12",
  "serde_json",
  "url",
  "uuid",
@@ -376,7 +376,7 @@ dependencies = [
  "mime",
  "serde",
  "serde_derive",
- "serde_ignored",
+ "serde_ignored 0.1.12",
  "serde_json",
  "url",
  "uuid",
@@ -1110,6 +1110,15 @@ name = "serde_ignored"
 version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "190e9765dcedb56be63b6e0993a006c7e3b071a016a304736e4a315dc01fb142"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "serde_ignored"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b516445dac1e3535b6d658a7b528d771153dfb272ed4180ca4617a20550365ff"
 dependencies = [
  "serde",
 ]
