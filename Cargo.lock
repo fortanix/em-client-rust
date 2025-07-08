@@ -335,7 +335,7 @@ dependencies = [
  "hyper",
  "lazy_static",
  "log 0.3.9",
- "mime",
+ "mime 0.2.6",
  "serde",
  "serde_derive",
  "serde_ignored 0.0.4",
@@ -358,7 +358,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.27",
  "mbedtls",
- "mime",
+ "mime 0.3.17",
  "serde",
  "serde_derive",
  "serde_ignored 0.1.12",
@@ -379,7 +379,7 @@ dependencies = [
  "hyper",
  "lazy_static",
  "log 0.4.27",
- "mime",
+ "mime 0.3.17",
  "serde",
  "serde_derive",
  "serde_ignored 0.1.12",
@@ -600,7 +600,7 @@ dependencies = [
  "httparse",
  "language-tags",
  "log 0.3.9",
- "mime",
+ "mime 0.2.6",
  "num_cpus",
  "time",
  "traitobject",
@@ -799,6 +799,12 @@ checksum = "ba626b8a6de5da682e1caa06bdb42a335aee5a84db8e5046a3e8ab17ba0a3ae0"
 dependencies = [
  "log 0.3.9",
 ]
+
+[[package]]
+name = "mime"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
 name = "minimal-lexical"
