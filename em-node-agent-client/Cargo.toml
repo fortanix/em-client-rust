@@ -11,7 +11,7 @@ default = ["client"]
 client = ["serde_ignored", "hyper", "url"]
 
 [dependencies]
-base64 = "0.10"
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 futures = "0.1"
 lazy_static = "1.0"
