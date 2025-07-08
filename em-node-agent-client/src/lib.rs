@@ -3,7 +3,16 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-#![allow(missing_docs, trivial_casts, unused_variables, unused_mut, unused_imports, unused_extern_crates, non_camel_case_types, unused_qualifications)]
+#![allow(
+    missing_docs,
+    trivial_casts,
+    unused_variables,
+    unused_mut,
+    unused_imports,
+    unused_extern_crates,
+    non_camel_case_types,
+    unused_qualifications
+)]
 
 extern crate base64;
 #[macro_use]
@@ -20,13 +29,12 @@ extern crate hyper;
 #[macro_use]
 extern crate url;
 
-
 extern crate mime;
 extern crate serde;
 extern crate serde_json;
 
-extern crate futures;
 extern crate chrono;
+extern crate futures;
 extern crate uuid;
 
 use futures::Stream;
@@ -51,122 +59,129 @@ pub const API_VERSION: &'static str = "1.0.0";
 pub trait Api {
     type Error;
 
-
     /// Get result of the certificate issuance
-    fn get_issue_certificate_response(&self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error>;
+    fn get_issue_certificate_response(
+        &self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 
     /// Submit request for certificate issuance
-    fn issue_certificate(&self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error>;
-
-
+    fn issue_certificate(
+        &self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 
     /// Get Fortanix attestation for the application
-    fn get_fortanix_attestation(&self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
+    fn get_fortanix_attestation(
+        &self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
 
     /// Get Target Info for node provisioning enclave
     fn get_target_info(&self) -> Result<models::TargetInfo, Self::Error>;
 
-
-
     /// Get Agent Version
     fn get_agent_version(&self) -> Result<models::VersionResponse, Self::Error>;
-
-
 }
 
 pub trait ApiMut {
     type Error;
 
-
     /// Get result of the certificate issuance
-    fn get_issue_certificate_response(&mut self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error>;
+    fn get_issue_certificate_response(
+        &mut self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 
     /// Submit request for certificate issuance
-    fn issue_certificate(&mut self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error>;
-
-
+    fn issue_certificate(
+        &mut self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 
     /// Get Fortanix attestation for the application
-    fn get_fortanix_attestation(&mut self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
+    fn get_fortanix_attestation(
+        &mut self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
 
     /// Get Target Info for node provisioning enclave
     fn get_target_info(&mut self) -> Result<models::TargetInfo, Self::Error>;
 
-
-
     /// Get Agent Version
     fn get_agent_version(&mut self) -> Result<models::VersionResponse, Self::Error>;
-
-
 }
 
 impl<T, E> Api for T
 where
-T: CertificateApi<Error = E> + EnclaveApi<Error = E> + SystemApi<Error = E> + 
+    T: CertificateApi<Error = E> + EnclaveApi<Error = E> + SystemApi<Error = E>,
 {
-type Error = E;
-    
-        fn get_issue_certificate_response(&self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error> {
-        self.get_issue_certificate_response(task_id, )
-        }
-    
-        fn issue_certificate(&self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error> {
-        self.issue_certificate(body, )
-        }
-    
+    type Error = E;
 
-    
-        fn get_fortanix_attestation(&self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
-        self.get_fortanix_attestation(body, )
-        }
-    
-        fn get_target_info(&self) -> Result<models::TargetInfo, Self::Error> {
+    fn get_issue_certificate_response(
+        &self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        self.get_issue_certificate_response(task_id)
+    }
+
+    fn issue_certificate(
+        &self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        self.issue_certificate(body)
+    }
+
+    fn get_fortanix_attestation(
+        &self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
+        self.get_fortanix_attestation(body)
+    }
+
+    fn get_target_info(&self) -> Result<models::TargetInfo, Self::Error> {
         self.get_target_info()
-        }
-    
+    }
 
-    
-        fn get_agent_version(&self) -> Result<models::VersionResponse, Self::Error> {
+    fn get_agent_version(&self) -> Result<models::VersionResponse, Self::Error> {
         self.get_agent_version()
-        }
-    
-
+    }
 }
 
 impl<T, E> ApiMut for T
 where
-    T: CertificateApiMut<Error = E> + EnclaveApiMut<Error = E> + SystemApiMut<Error = E> + 
+    T: CertificateApiMut<Error = E> + EnclaveApiMut<Error = E> + SystemApiMut<Error = E>,
 {
     type Error = E;
 
-
-
-
-    fn get_issue_certificate_response(&mut self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error> {
-        self.get_issue_certificate_response(task_id, )
+    fn get_issue_certificate_response(
+        &mut self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        self.get_issue_certificate_response(task_id)
     }
 
-    fn issue_certificate(&mut self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error> {
-        self.issue_certificate(body, )
+    fn issue_certificate(
+        &mut self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        self.issue_certificate(body)
     }
 
-
-
-    fn get_fortanix_attestation(&mut self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
-        self.get_fortanix_attestation(body, )
+    fn get_fortanix_attestation(
+        &mut self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
+        self.get_fortanix_attestation(body)
     }
 
     fn get_target_info(&mut self) -> Result<models::TargetInfo, Self::Error> {
         self.get_target_info()
     }
 
-
-
     fn get_agent_version(&mut self) -> Result<models::VersionResponse, Self::Error> {
         self.get_agent_version()
     }
-
-
 }
 
 impl<T, E> Api for std::cell::RefCell<T>
@@ -175,57 +190,66 @@ where
 {
     type Error = E;
 
-
-
-    fn get_issue_certificate_response(&self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error> {
-        self.borrow_mut().get_issue_certificate_response(task_id, )
+    fn get_issue_certificate_response(
+        &self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        self.borrow_mut().get_issue_certificate_response(task_id)
     }
 
-    fn issue_certificate(&self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error> {
-        self.borrow_mut().issue_certificate(body, )
+    fn issue_certificate(
+        &self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        self.borrow_mut().issue_certificate(body)
     }
 
-
-
-    fn get_fortanix_attestation(&self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
-        self.borrow_mut().get_fortanix_attestation(body, )
+    fn get_fortanix_attestation(
+        &self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
+        self.borrow_mut().get_fortanix_attestation(body)
     }
 
     fn get_target_info(&self) -> Result<models::TargetInfo, Self::Error> {
         self.borrow_mut().get_target_info()
     }
 
-
-
     fn get_agent_version(&self) -> Result<models::VersionResponse, Self::Error> {
         self.borrow_mut().get_agent_version()
     }
-
-
 }
 
 pub trait CertificateApi {
     type Error;
 
-
     /// Get result of the certificate issuance
-    fn get_issue_certificate_response(&self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error>;
+    fn get_issue_certificate_response(
+        &self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 
     /// Submit request for certificate issuance
-    fn issue_certificate(&self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error>;
-
+    fn issue_certificate(
+        &self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 }
 
 pub trait CertificateApiMut {
     type Error;
 
-
     /// Get result of the certificate issuance
-    fn get_issue_certificate_response(&mut self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error>;
+    fn get_issue_certificate_response(
+        &mut self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 
     /// Submit request for certificate issuance
-    fn issue_certificate(&mut self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error>;
-
+    fn issue_certificate(
+        &mut self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error>;
 }
 
 impl<T, E> CertificateApiMut for T
@@ -234,39 +258,45 @@ where
 {
     type Error = E;
 
-    fn get_issue_certificate_response(&mut self, task_id: uuid::Uuid) -> Result<models::IssueCertificateResponse, Self::Error> {
-        <T as CertificateApi>::get_issue_certificate_response(self, task_id, )
+    fn get_issue_certificate_response(
+        &mut self,
+        task_id: uuid::Uuid,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        <T as CertificateApi>::get_issue_certificate_response(self, task_id)
     }
 
-    fn issue_certificate(&mut self, body: models::IssueCertificateRequest) -> Result<models::IssueCertificateResponse, Self::Error> {
-        <T as CertificateApi>::issue_certificate(self, body, )
+    fn issue_certificate(
+        &mut self,
+        body: models::IssueCertificateRequest,
+    ) -> Result<models::IssueCertificateResponse, Self::Error> {
+        <T as CertificateApi>::issue_certificate(self, body)
     }
-
 }
-
 
 pub trait EnclaveApi {
     type Error;
 
-
     /// Get Fortanix attestation for the application
-    fn get_fortanix_attestation(&self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
+    fn get_fortanix_attestation(
+        &self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
 
     /// Get Target Info for node provisioning enclave
     fn get_target_info(&self) -> Result<models::TargetInfo, Self::Error>;
-
 }
 
 pub trait EnclaveApiMut {
     type Error;
 
-
     /// Get Fortanix attestation for the application
-    fn get_fortanix_attestation(&mut self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
+    fn get_fortanix_attestation(
+        &mut self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error>;
 
     /// Get Target Info for node provisioning enclave
     fn get_target_info(&mut self) -> Result<models::TargetInfo, Self::Error>;
-
 }
 
 impl<T, E> EnclaveApiMut for T
@@ -275,33 +305,30 @@ where
 {
     type Error = E;
 
-    fn get_fortanix_attestation(&mut self, body: models::GetFortanixAttestationRequest) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
-        <T as EnclaveApi>::get_fortanix_attestation(self, body, )
+    fn get_fortanix_attestation(
+        &mut self,
+        body: models::GetFortanixAttestationRequest,
+    ) -> Result<models::GetFortanixAttestationResponse, Self::Error> {
+        <T as EnclaveApi>::get_fortanix_attestation(self, body)
     }
 
     fn get_target_info(&mut self) -> Result<models::TargetInfo, Self::Error> {
-        <T as EnclaveApi>::get_target_info(self, )
+        <T as EnclaveApi>::get_target_info(self)
     }
-
 }
-
 
 pub trait SystemApi {
     type Error;
 
-
     /// Get Agent Version
     fn get_agent_version(&self) -> Result<models::VersionResponse, Self::Error>;
-
 }
 
 pub trait SystemApiMut {
     type Error;
 
-
     /// Get Agent Version
     fn get_agent_version(&mut self) -> Result<models::VersionResponse, Self::Error>;
-
 }
 
 impl<T, E> SystemApiMut for T
@@ -311,12 +338,9 @@ where
     type Error = E;
 
     fn get_agent_version(&mut self) -> Result<models::VersionResponse, Self::Error> {
-        <T as SystemApi>::get_agent_version(self, )
+        <T as SystemApi>::get_agent_version(self)
     }
-
 }
-
-
 
 #[cfg(feature = "client")]
 pub mod client;
@@ -381,7 +405,6 @@ pub mod base64_format {
     }
 }
 pub use base64_format::ByteArray;
-
 
 /// Very simple error type - just holds a description of the error. This is useful for human
 /// diagnosis and troubleshooting, but not for applications to parse. The justification for this

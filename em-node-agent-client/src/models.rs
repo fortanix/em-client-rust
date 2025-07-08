@@ -8,25 +8,23 @@ extern crate chrono;
 
 use serde::ser::Serializer;
 
-use std::collections::HashMap;
 use models;
+use std::collections::HashMap;
 use std::string::ParseError;
 use uuid;
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AgentManagerAuthRequest {
     /// Node IP
     #[serde(rename = "node_ip")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub node_ip: Option<String>,
 
     /// Node Name
     #[serde(rename = "node_name")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
-
 }
 
 impl AgentManagerAuthRequest {
@@ -38,39 +36,33 @@ impl AgentManagerAuthRequest {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AgentManagerAuthResponse {
     /// Access token for node
     #[serde(rename = "access_token")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub access_token: Option<String>,
-
 }
 
 impl AgentManagerAuthResponse {
     pub fn new() -> AgentManagerAuthResponse {
-        AgentManagerAuthResponse {
-            access_token: None,
-        }
+        AgentManagerAuthResponse { access_token: None }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AppHeartbeatRequest {
     /// Application Heartbeat csr
     #[serde(rename = "csr")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub csr: Option<String>,
 
     /// Node Id for app
     #[serde(rename = "node_id")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub node_id: Option<uuid::Uuid>,
-
 }
 
 impl AppHeartbeatRequest {
@@ -82,39 +74,33 @@ impl AppHeartbeatRequest {
     }
 }
 
-
 /// App Heartbeat Response
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct AppHeartbeatResponse {
     #[serde(rename = "status")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<models::ResponseStatus>,
-
 }
 
 impl AppHeartbeatResponse {
     pub fn new() -> AppHeartbeatResponse {
-        AppHeartbeatResponse {
-            status: None,
-        }
+        AppHeartbeatResponse { status: None }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct GetFortanixAttestationRequest {
     /// Enclave Report bytes
     #[serde(rename = "report")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub report: Option<String>,
 
     /// Fortanix attestation CSR
     #[serde(rename = "attestation_csr")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation_csr: Option<String>,
-
 }
 
 impl GetFortanixAttestationRequest {
@@ -126,25 +112,23 @@ impl GetFortanixAttestationRequest {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct GetFortanixAttestationResponse {
     /// Verified attestation certificate
     #[serde(rename = "attestation_certificate")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation_certificate: Option<String>,
 
     /// Node Certificate
     #[serde(rename = "node_certificate")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub node_certificate: Option<String>,
 
     /// FQPE Report bytes
     #[serde(rename = "fqpe_report")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fqpe_report: Option<String>,
-
 }
 
 impl GetFortanixAttestationResponse {
@@ -157,43 +141,37 @@ impl GetFortanixAttestationResponse {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct IssueCertificateRequest {
     /// Application CSR
     #[serde(rename = "csr")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub csr: Option<String>,
-
 }
 
 impl IssueCertificateRequest {
     pub fn new() -> IssueCertificateRequest {
-        IssueCertificateRequest {
-            csr: None,
-        }
+        IssueCertificateRequest { csr: None }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct IssueCertificateResponse {
     /// Task Id
     #[serde(rename = "task_id")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub task_id: Option<uuid::Uuid>,
 
     #[serde(rename = "task_status")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub task_status: Option<models::TaskStatusType>,
 
     /// App Certificate
     #[serde(rename = "certificate")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub certificate: Option<String>,
-
 }
 
 impl IssueCertificateResponse {
@@ -206,21 +184,19 @@ impl IssueCertificateResponse {
     }
 }
 
-
 /// Node local data
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct NodeLocalData {
     /// Node id
     #[serde(rename = "node_id")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub node_id: Option<uuid::Uuid>,
 
     /// node certificate
     #[serde(rename = "certificate")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub certificate: Option<String>,
-
 }
 
 impl NodeLocalData {
@@ -232,7 +208,6 @@ impl NodeLocalData {
     }
 }
 
-
 /// Status string for a response
 /// Enumeration of values.
 /// Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
@@ -241,7 +216,7 @@ impl NodeLocalData {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
-pub enum ResponseStatus { 
+pub enum ResponseStatus {
     #[serde(rename = "OK")]
     OK,
     #[serde(rename = "NOT_OK")]
@@ -250,7 +225,7 @@ pub enum ResponseStatus {
 
 impl ::std::fmt::Display for ResponseStatus {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match *self { 
+        match *self {
             ResponseStatus::OK => write!(f, "{}", "OK"),
             ResponseStatus::NOT_OK => write!(f, "{}", "NOT_OK"),
         }
@@ -268,25 +243,20 @@ impl ::std::str::FromStr for ResponseStatus {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct TargetInfo {
     /// Enclave Target Info
     #[serde(rename = "targetInfo")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub target_info: Option<String>,
-
 }
 
 impl TargetInfo {
     pub fn new() -> TargetInfo {
-        TargetInfo {
-            target_info: None,
-        }
+        TargetInfo { target_info: None }
     }
 }
-
 
 /// Status string for a task
 /// Enumeration of values.
@@ -296,7 +266,7 @@ impl TargetInfo {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
-pub enum TaskStatusType { 
+pub enum TaskStatusType {
     #[serde(rename = "INPROGRESS")]
     INPROGRESS,
     #[serde(rename = "FAILED")]
@@ -311,7 +281,7 @@ pub enum TaskStatusType {
 
 impl ::std::fmt::Display for TaskStatusType {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match *self { 
+        match *self {
             TaskStatusType::INPROGRESS => write!(f, "{}", "INPROGRESS"),
             TaskStatusType::FAILED => write!(f, "{}", "FAILED"),
             TaskStatusType::SUCCESS => write!(f, "{}", "SUCCESS"),
@@ -335,23 +305,18 @@ impl ::std::str::FromStr for TaskStatusType {
     }
 }
 
-
 /// Agent Version
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
 pub struct VersionResponse {
     /// Agent Version
     #[serde(rename = "version")]
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-
 }
 
 impl VersionResponse {
     pub fn new() -> VersionResponse {
-        VersionResponse {
-            version: None,
-        }
+        VersionResponse { version: None }
     }
 }
-

@@ -39,7 +39,6 @@ pub mod responses {
         /// Create Mime objects for the response content types for GetAgentVersion
         pub static ref GET_AGENT_VERSION_AGENT_VERSION: Mime = "application/json".parse().unwrap();
     }
-
 }
 
 pub mod requests {
@@ -59,5 +58,4 @@ pub mod requests {
         /// Create Mime objects for the request content types for GetFortanixAttestation
         pub static ref GET_FORTANIX_ATTESTATION: Mime = "application/json".parse().unwrap();
     }
-
 }

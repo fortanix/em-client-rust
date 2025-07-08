@@ -388,7 +388,6 @@ pub mod responses {
         /// Create Mime objects for the response content types for GetZones
         pub static ref GET_ZONES_DETAILS_OF_ALL_THE_ZONES: Mime = "application/json".parse().unwrap();
     }
-
 }
 
 pub mod requests {
@@ -573,5 +572,4 @@ pub mod requests {
         /// Create Mime objects for the request content types for UpdateFinalWorkflowGraph
         pub static ref UPDATE_FINAL_WORKFLOW_GRAPH: Mime = "application/json".parse().unwrap();
     }
-
 }
