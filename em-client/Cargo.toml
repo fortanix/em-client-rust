@@ -16,7 +16,7 @@ bitflags = "1.2"
 chrono = { version = "0.4", features = ["serde"] }
 futures = "0.1"
 lazy_static = "1.0"
-log = "0.3.0"
+log = "0.4.27"
 mime = "0.2.6"
 serde = "1.0"
 serde_derive = "1.0"
