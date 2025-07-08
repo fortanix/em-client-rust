@@ -15,8 +15,10 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "client")]
 #[macro_use]
 extern crate hyper;
+#[cfg(feature = "client")]
 #[macro_use]
 extern crate url;
 

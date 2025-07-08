@@ -77,8 +77,8 @@ fn get_client(url: &str, token: Option<String>, root_ca_str: &Option<String>) ->
         Some(str) => {
             let cert = Certificate::from_pem(str.as_bytes()).unwrap();
 
-            let mut connector = TlsConnector::builder().unwrap();
-            connector.add_root_certificate(cert).unwrap();
+            let mut connector = TlsConnector::builder();
+            connector.add_root_certificate(cert);
             NativeTlsClient::from(connector.build().unwrap())
         }
         None => {
