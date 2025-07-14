@@ -19,5 +19,5 @@ sgx-isa = { version = "0.4" }
 hyper = { version = "0.10", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 uuid = { version = "0.6.3", features = ["serde"] }
-em-client = { version = "2.0.0", default-features = false, features = ["client"] }
+em-client = { version = "4.0.1", default-features = false, features = ["client"] }
 b64-ct = "0.1.1"
