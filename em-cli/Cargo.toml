@@ -8,7 +8,7 @@ description = "This crate provides a cli for Enclave Manager."
 repository = "https://github.com/fortanix/em-client-rust"
 
 [dependencies]
-clap = "2.2.5"                                   # MIT
+clap = "4.5.43"                                   # MIT
 crypto-hash = "0.3"                              # MIT
 lazy_static = "1"
 serde_bytes = "0.11"
