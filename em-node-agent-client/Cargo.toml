@@ -15,7 +15,7 @@ base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 futures = "0.3"
 lazy_static = "1.0"
-log = "0.4.27"
+log = "0.4.28"
 mime = "0.3.17"
 serde = "1.0"
 serde_derive = "1.0"
