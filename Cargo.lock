@@ -320,7 +320,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sgx-isa",
- "uuid",
+ "uuid 1.18.1",
 ]
 
 [[package]]
@@ -341,7 +341,7 @@ dependencies = [
  "serde_ignored 0.0.4",
  "serde_json",
  "url",
- "uuid",
+ "uuid 0.6.5",
 ]
 
 [[package]]
@@ -364,7 +364,7 @@ dependencies = [
  "serde_ignored 0.1.12",
  "serde_json",
  "url",
- "uuid",
+ "uuid 1.18.1",
 ]
 
 [[package]]
@@ -385,7 +385,7 @@ dependencies = [
  "serde_ignored 0.1.12",
  "serde_json",
  "url",
- "uuid",
+ "uuid 1.18.1",
 ]
 
 [[package]]
@@ -1413,6 +1413,18 @@ dependencies = [
  "cfg-if 0.1.10",
  "rand",
  "serde",
+]
+
+[[package]]
+name = "uuid"
+version = "1.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
+dependencies = [
+ "getrandom",
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
