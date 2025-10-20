@@ -26,5 +26,5 @@ serde_ignored = {version = "0.1.12", optional = true}
 url = {version = "1.5", optional = true}
 
 [dev-dependencies]
-clap = "2.25"
+clap = "4.5"
 error-chain = "0.12"
