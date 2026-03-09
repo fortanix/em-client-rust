@@ -280,7 +280,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -377,7 +377,7 @@ dependencies = [
 
 [[package]]
 name = "em-client"
-version = "4.0.1"
+version = "4.0.2"
 dependencies = [
  "base64 0.22.1",
  "bitflags 2.9.4",
@@ -912,9 +912,9 @@ checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 
 [[package]]
 name = "mbedtls"
-version = "0.13.3"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b8114ab6c15889057a80479744eeb891e090ed2dd0258f13a7ef8ef02848293"
+checksum = "96ab34e3a3b8eb0ed4dc157a65c001f5a9597e2a9aa580b7cab55c40cbdb375a"
 dependencies = [
  "bitflags 1.3.2",
  "byteorder",
