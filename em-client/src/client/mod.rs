@@ -192,7 +192,10 @@ impl Client {
             return Cow::Borrowed(operation);
         }
         if let Some(path_without_v1) = operation.strip_prefix("/v1/") {
-            return Cow::Owned(format!("/api/v1/confidential_computing/{}", path_without_v1));
+            return Cow::Owned(format!(
+                "/api/v1/confidential_computing/{}",
+                path_without_v1
+            ));
         }
         return Cow::Borrowed(operation);
     }
