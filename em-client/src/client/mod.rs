@@ -8765,7 +8765,7 @@ fn compute_sha256(input: &[u8]) -> Result<[u8; SHA256_BYTE_LENGTH], ApiError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ApplicationConfigApi, Client, SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH, Sha256Hash};
+    use crate::{ApplicationConfigApi, Client, Sha256Hash, SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH};
     use client::deserialize_config_checked;
     use std::convert::{From, TryFrom};
 
@@ -8847,7 +8847,8 @@ mod tests {
         let mut server = mockito::Server::new();
         let expected_hash = Sha256Hash::try_from(
             "43fd2e42e40365622fa81d3a3037b6ae130b552dc5f026d8c4168f89c7ff20c8",
-        ).unwrap();
+        )
+        .unwrap();
 
         let url = server.url();
         let mut client = Client::try_new_http(&url).unwrap();
@@ -8862,10 +8863,7 @@ mod tests {
         client.set_use_new_paths(true);
         // check that the new path is used after remap is enabled
         let mock_remap_path = server
-            .mock(
-                "GET",
-                "/api/v1/confidential_computing/runtime/app_configs",
-            )
+            .mock("GET", "/api/v1/confidential_computing/runtime/app_configs")
             .with_status(201)
             .create();
 
