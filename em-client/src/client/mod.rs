@@ -172,7 +172,7 @@ impl Client {
         &mut self.headers
     }
 
-    pub fn use_new_paths(&self) -> bool {
+    pub fn uses_new_paths(&self) -> bool {
         self.use_new_paths
     }
 
@@ -187,20 +187,14 @@ impl Client {
         }
     }
 
-    fn remap_operation_path(&self, operation: String) -> String {
+    fn remap_operation_path<'a>(&self, operation: &'a str) -> Cow<'a, str> {
         if !self.use_new_paths {
-            return operation;
+            return Cow::Borrowed(operation);
         }
         if let Some(path_without_v1) = operation.strip_prefix("/v1/") {
-            let api_category = if let Some((api_category, _)) = path_without_v1.split_once("/") {
-                api_category
-            } else {
-                path_without_v1
-            };
-
-            return format!("/api/v1/confidential_computing/{}", path_without_v1);
+            return Cow::Owned(format!("/api/v1/confidential_computing/{}", path_without_v1));
         }
-        return operation;
+        return Cow::Borrowed(operation);
     }
 }
 
@@ -1773,7 +1767,7 @@ impl ApplicationConfigApi for Client {
         let mut url = format!(
             "{}{}",
             self.base_path,
-            self.remap_operation_path(operation_path.to_owned())
+            self.remap_operation_path(operation_path)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8823,20 +8817,20 @@ mod tests {
     fn test_remap_operation_path() {
         let mut client = Client::try_new_http("http://example.com:1234").unwrap();
         assert_eq!(
-            client.remap_operation_path("/v1/test/path/no_remap".to_owned()),
+            client.remap_operation_path("/v1/test/path/no_remap"),
             "/v1/test/path/no_remap"
         );
         assert_eq!(
-            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/no_remap".to_owned()),
+            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/no_remap"),
             "/v1/test/654389468329ferugfirwvbyr/no_remap"
         );
         client.set_use_new_paths(true);
         assert_eq!(
-            client.remap_operation_path("/v1/something/path/remap".to_owned()),
+            client.remap_operation_path("/v1/something/path/remap"),
             "/api/v1/confidential_computing/something/path/remap"
         );
         assert_eq!(
-            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/remap".to_owned()),
+            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/remap"),
             "/api/v1/confidential_computing/test/654389468329ferugfirwvbyr/remap"
         );
     }
