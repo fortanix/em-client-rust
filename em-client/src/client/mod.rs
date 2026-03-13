@@ -53,18 +53,6 @@ define_encode_set! {
     pub ID_ENCODE_SET = [PATH_SEGMENT_ENCODE_SET] | {'|'}
 }
 
-static NEW_FORMAT_UNSUPPORTED_CATEGORIES: [&'static str; 9] = [
-    "sys",
-    "session",
-    "user",
-    "users",
-    "accounts",
-    "admin",
-    "groups",
-    "third_party_groups",
-    "usage",
-];
-
 /// Convert input into a base path, e.g. "http://example:123". Also checks the scheme as it goes.
 fn into_base_path(
     input: &str,
@@ -92,7 +80,6 @@ pub struct Client {
     hyper_client: Arc<hyper::client::Client>,
     base_path: String,
     headers: Headers,
-    use_new_paths: bool,
 }
 
 impl fmt::Debug for Client {
@@ -107,7 +94,6 @@ impl Clone for Client {
             hyper_client: self.hyper_client.clone(),
             base_path: self.base_path.clone(),
             headers: self.headers.clone(),
-            use_new_paths: self.use_new_paths,
         }
     }
 }
@@ -151,7 +137,6 @@ impl Client {
             hyper_client: Arc::new(hyper_client),
             base_path: into_base_path(base_path, protocol)?,
             headers: Headers::new(),
-            use_new_paths: false,
         })
     }
 
@@ -176,47 +161,11 @@ impl Client {
             hyper_client: hyper_client,
             base_path: into_base_path(base_path, None)?,
             headers: Headers::new(),
-            use_new_paths: false,
         })
     }
 
     pub fn headers(&mut self) -> &mut Headers {
         &mut self.headers
-    }
-
-    pub fn use_new_paths(&self) -> bool {
-        self.use_new_paths
-    }
-
-    pub fn set_use_new_paths(&mut self, use_new_paths: bool) {
-        self.use_new_paths = use_new_paths;
-    }
-
-    pub fn with_new_paths(self) -> Self {
-        Self {
-            use_new_paths: true,
-            ..self
-        }
-    }
-
-    fn remap_operation_path(&self, operation: String) -> String {
-        if !self.use_new_paths {
-            return operation;
-        }
-        if let Some(path_without_v1) = operation.strip_prefix("/v1/") {
-            let api_category = if let Some((api_category, _)) = path_without_v1.split_once("/") {
-                api_category
-            } else {
-                path_without_v1
-            };
-
-            if NEW_FORMAT_UNSUPPORTED_CATEGORIES.contains(&api_category) {
-                return operation;
-            } else {
-                return format!("/api/v1/confidential_computing/{}", path_without_v1);
-            }
-        }
-        return operation;
     }
 }
 
@@ -227,12 +176,7 @@ impl AccountsApi for Client {
         &self,
         param_body: models::AccountRequest,
     ) -> Result<models::Account, ApiError> {
-        let operation_path = format!("/v1/accounts");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/accounts", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -318,14 +262,10 @@ impl AccountsApi for Client {
     }
 
     fn delete_account(&self, param_account_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/accounts/{account_id}",
-            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/accounts/{account_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -397,14 +337,10 @@ impl AccountsApi for Client {
     }
 
     fn get_account(&self, param_account_id: uuid::Uuid) -> Result<models::Account, ApiError> {
-        let operation_path = format!(
-            "/v1/accounts/{account_id}",
-            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/accounts/{account_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -484,12 +420,7 @@ impl AccountsApi for Client {
     }
 
     fn get_accounts(&self) -> Result<models::AccountListResponse, ApiError> {
-        let operation_path = format!("/v1/accounts");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/accounts", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -569,14 +500,10 @@ impl AccountsApi for Client {
     }
 
     fn select_account(&self, param_account_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/accounts/select_account/{account_id}",
-            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/accounts/select_account/{account_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -652,14 +579,10 @@ impl AccountsApi for Client {
         param_account_id: uuid::Uuid,
         param_body: models::AccountUpdateRequest,
     ) -> Result<models::Account, ApiError> {
-        let operation_path = format!(
-            "/v1/accounts/{account_id}",
-            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/accounts/{account_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            account_id = utf8_percent_encode(&param_account_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -749,12 +672,7 @@ impl AppApi for Client {
     type Error = ApiError;
 
     fn add_application(&self, param_body: models::AppRequest) -> Result<models::App, ApiError> {
-        let operation_path = format!("/v1/apps");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/apps", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -840,14 +758,10 @@ impl AppApi for Client {
     }
 
     fn delete_app(&self, param_app_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/apps/{app_id}",
-            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/apps/{app_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -927,12 +841,7 @@ impl AppApi for Client {
         param_offset: Option<i32>,
         param_sort_by: Option<String>,
     ) -> Result<models::GetAllAppsResponse, ApiError> {
-        let operation_path = format!("/v1/apps");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/apps", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -1030,14 +939,10 @@ impl AppApi for Client {
     }
 
     fn get_app(&self, param_app_id: uuid::Uuid) -> Result<models::App, ApiError> {
-        let operation_path = format!(
-            "/v1/apps/{app_id}",
-            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/apps/{app_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -1121,15 +1026,11 @@ impl AppApi for Client {
         param_node_id: uuid::Uuid,
         param_app_id: uuid::Uuid,
     ) -> Result<models::Certificate, ApiError> {
-        let operation_path = format!(
-            "/v1/apps/{app_id}/node/{node_id}/certificate",
+        let mut url = format!(
+            "{}/v1/apps/{app_id}/node/{node_id}/certificate",
+            self.base_path,
             node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET),
             app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
-        );
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -1213,16 +1114,13 @@ impl AppApi for Client {
         param_node_id: uuid::Uuid,
         param_app_id: uuid::Uuid,
     ) -> Result<models::CertificateDetails, ApiError> {
-        let operation_path = format!(
-            "/v1/apps/{app_id}/node/{node_id}/certificate-details",
+        let mut url = format!(
+            "{}/v1/apps/{app_id}/node/{node_id}/certificate-details",
+            self.base_path,
             node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET),
             app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
         );
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
         let query_string_str = query_string.finish();
@@ -1301,12 +1199,8 @@ impl AppApi for Client {
     }
 
     fn get_apps_unique_labels(&self) -> Result<models::LabelsCount, ApiError> {
-        let operation_path = format!("/v1/apps/unique_labels/count");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/apps/unique_labels/count", self.base_path);
+
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
         let query_string_str = query_string.finish();
@@ -1388,14 +1282,10 @@ impl AppApi for Client {
         param_app_id: uuid::Uuid,
         param_body: models::AppBodyUpdateRequest,
     ) -> Result<models::App, ApiError> {
-        let operation_path = format!(
-            "/v1/apps/{app_id}",
-            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/apps/{app_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -1488,12 +1378,7 @@ impl ApplicationConfigApi for Client {
         &self,
         param_body: models::ApplicationConfig,
     ) -> Result<models::ApplicationConfigResponse, ApiError> {
-        let operation_path = format!("/v1/app_configs");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/app_configs", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -1582,14 +1467,10 @@ impl ApplicationConfigApi for Client {
     }
 
     fn delete_application_config(&self, param_config_id: String) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/app_configs/{config_id}",
-            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/app_configs/{config_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -1668,12 +1549,7 @@ impl ApplicationConfigApi for Client {
         param_limit: Option<i32>,
         param_offset: Option<i32>,
     ) -> Result<models::GetAllApplicationConfigsResponse, ApiError> {
-        let operation_path = format!("/v1/app_configs");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/app_configs", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -1771,14 +1647,10 @@ impl ApplicationConfigApi for Client {
         &self,
         param_config_id: String,
     ) -> Result<models::ApplicationConfigResponse, ApiError> {
-        let operation_path = format!(
-            "/v1/app_configs/{config_id}",
-            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/app_configs/{config_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -1862,12 +1734,7 @@ impl ApplicationConfigApi for Client {
         &self,
         expected_hash: &[u8; 32],
     ) -> Result<models::RuntimeAppConfig, ApiError> {
-        let operation_path = format!("/v1/runtime/app_configs");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/runtime/app_configs", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -1947,14 +1814,10 @@ impl ApplicationConfigApi for Client {
         &self,
         param_config_id: String,
     ) -> Result<models::RuntimeAppConfig, ApiError> {
-        let operation_path = format!(
-            "/v1/runtime/app_configs/{config_id}",
-            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/runtime/app_configs/{config_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -2039,14 +1902,10 @@ impl ApplicationConfigApi for Client {
         param_config_id: String,
         param_body: models::UpdateApplicationConfigRequest,
     ) -> Result<models::ApplicationConfigResponse, ApiError> {
-        let operation_path = format!(
-            "/v1/app_configs/{config_id}",
-            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/app_configs/{config_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            config_id = utf8_percent_encode(&param_config_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -2143,14 +2002,10 @@ impl ApprovalRequestsApi for Client {
         param_request_id: uuid::Uuid,
         param_body: Option<models::ApproveRequest>,
     ) -> Result<models::ApprovalRequest, ApiError> {
-        let operation_path = format!(
-            "/v1/approval_requests/{request_id}/approve",
-            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/approval_requests/{request_id}/approve",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -2248,12 +2103,7 @@ impl ApprovalRequestsApi for Client {
         &self,
         param_body: models::ApprovalRequestRequest,
     ) -> Result<models::ApprovalRequest, ApiError> {
-        let operation_path = format!("/v1/approval_requests");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/approval_requests", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -2341,14 +2191,10 @@ impl ApprovalRequestsApi for Client {
     }
 
     fn delete_approval_request(&self, param_request_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/approval_requests/{request_id}",
-            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/approval_requests/{request_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -2424,14 +2270,10 @@ impl ApprovalRequestsApi for Client {
         param_request_id: uuid::Uuid,
         param_body: Option<models::DenyRequest>,
     ) -> Result<models::ApprovalRequest, ApiError> {
-        let operation_path = format!(
-            "/v1/approval_requests/{request_id}/deny",
-            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/approval_requests/{request_id}/deny",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -2535,12 +2377,7 @@ impl ApprovalRequestsApi for Client {
         param_limit: Option<i32>,
         param_offset: Option<i32>,
     ) -> Result<models::GetAllApprovalRequests, ApiError> {
-        let operation_path = format!("/v1/approval_requests");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/approval_requests", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -2647,14 +2484,10 @@ impl ApprovalRequestsApi for Client {
         &self,
         param_request_id: uuid::Uuid,
     ) -> Result<models::ApprovalRequest, ApiError> {
-        let operation_path = format!(
-            "/v1/approval_requests/{request_id}",
-            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/approval_requests/{request_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -2738,14 +2571,10 @@ impl ApprovalRequestsApi for Client {
         &self,
         param_request_id: uuid::Uuid,
     ) -> Result<models::ApprovableResult, ApiError> {
-        let operation_path = format!(
-            "/v1/approval_requests/{request_id}/result",
-            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/approval_requests/{request_id}/result",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            request_id = utf8_percent_encode(&param_request_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -2833,12 +2662,7 @@ impl AuthApi for Client {
         &self,
         param_body: Option<models::AuthRequest>,
     ) -> Result<models::AuthResponse, ApiError> {
-        let operation_path = format!("/v1/sys/auth");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/sys/auth", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -2936,12 +2760,7 @@ impl BuildApi for Client {
         &self,
         param_body: models::ConvertAppBuildRequest,
     ) -> Result<models::Build, ApiError> {
-        let operation_path = format!("/v1/builds/convert-app/aci");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/builds/convert-app", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -3030,12 +2849,7 @@ impl BuildApi for Client {
         &self,
         param_body: models::CreateBuildRequest,
     ) -> Result<models::Build, ApiError> {
-        let operation_path = format!("/v1/builds");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/builds", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -3120,14 +2934,10 @@ impl BuildApi for Client {
     }
 
     fn delete_build(&self, param_build_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/builds/{build_id}",
-            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/builds/{build_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -3209,12 +3019,7 @@ impl BuildApi for Client {
         param_offset: Option<i32>,
         param_sort_by: Option<String>,
     ) -> Result<models::GetAllBuildsResponse, ApiError> {
-        let operation_path = format!("/v1/builds");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/builds", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -3318,14 +3123,10 @@ impl BuildApi for Client {
     }
 
     fn get_build(&self, param_build_id: uuid::Uuid) -> Result<models::Build, ApiError> {
-        let operation_path = format!(
-            "/v1/builds/{build_id}",
-            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/builds/{build_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -3413,14 +3214,10 @@ impl BuildApi for Client {
         param_limit: Option<i32>,
         param_offset: Option<i32>,
     ) -> Result<models::GetAllBuildDeploymentsResponse, ApiError> {
-        let operation_path = format!(
-            "/v1/builds/deployments/{build_id}",
-            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/builds/deployments/{build_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -3520,14 +3317,10 @@ impl BuildApi for Client {
         param_build_id: uuid::Uuid,
         param_body: models::BuildUpdateRequest,
     ) -> Result<models::Build, ApiError> {
-        let operation_path = format!(
-            "/v1/builds/{build_id}",
-            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/builds/{build_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            build_id = utf8_percent_encode(&param_build_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -3617,14 +3410,10 @@ impl CertificateApi for Client {
     type Error = ApiError;
 
     fn get_certificate(&self, param_cert_id: uuid::Uuid) -> Result<models::Certificate, ApiError> {
-        let operation_path = format!(
-            "/v1/certificates/{cert_id}",
-            cert_id = utf8_percent_encode(&param_cert_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/certificates/{cert_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            cert_id = utf8_percent_encode(&param_cert_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -3707,12 +3496,7 @@ impl CertificateApi for Client {
         &self,
         param_body: models::NewCertificateRequest,
     ) -> Result<models::TaskResult, ApiError> {
-        let operation_path = format!("/v1/certificates");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/certificates", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -3804,12 +3588,7 @@ impl DatasetApi for Client {
         &self,
         param_body: models::CreateDatasetRequest,
     ) -> Result<models::Dataset, ApiError> {
-        let operation_path = format!("/v1/datasets");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/datasets", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -3895,14 +3674,10 @@ impl DatasetApi for Client {
     }
 
     fn delete_dataset(&self, param_dataset_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/datasets/{dataset_id}",
-            dataset_id = utf8_percent_encode(&param_dataset_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/datasets/{dataset_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            dataset_id = utf8_percent_encode(&param_dataset_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -3980,12 +3755,7 @@ impl DatasetApi for Client {
         param_limit: Option<i32>,
         param_offset: Option<i32>,
     ) -> Result<models::GetAllDatasetsResponse, ApiError> {
-        let operation_path = format!("/v1/datasets");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/datasets", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -4077,14 +3847,10 @@ impl DatasetApi for Client {
     }
 
     fn get_dataset(&self, param_dataset_id: uuid::Uuid) -> Result<models::Dataset, ApiError> {
-        let operation_path = format!(
-            "/v1/datasets/{dataset_id}",
-            dataset_id = utf8_percent_encode(&param_dataset_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/datasets/{dataset_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            dataset_id = utf8_percent_encode(&param_dataset_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -4168,14 +3934,10 @@ impl DatasetApi for Client {
         param_dataset_id: uuid::Uuid,
         param_body: models::DatasetUpdateRequest,
     ) -> Result<models::Dataset, ApiError> {
-        let operation_path = format!(
-            "/v1/datasets/{dataset_id}",
-            dataset_id = utf8_percent_encode(&param_dataset_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/datasets/{dataset_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            dataset_id = utf8_percent_encode(&param_dataset_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -4265,14 +4027,10 @@ impl NodeApi for Client {
     type Error = ApiError;
 
     fn deactivate_node(&self, param_node_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/nodes/{node_id}/deactivate",
-            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/nodes/{node_id}/deactivate",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -4354,12 +4112,7 @@ impl NodeApi for Client {
         param_offset: Option<i32>,
         param_sort_by: Option<String>,
     ) -> Result<models::GetAllNodesResponse, ApiError> {
-        let operation_path = format!("/v1/nodes");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/nodes", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -4463,14 +4216,10 @@ impl NodeApi for Client {
     }
 
     fn get_node(&self, param_node_id: uuid::Uuid) -> Result<models::Node, ApiError> {
-        let operation_path = format!(
-            "/v1/nodes/{node_id}",
-            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/nodes/{node_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -4553,14 +4302,10 @@ impl NodeApi for Client {
         &self,
         param_node_id: uuid::Uuid,
     ) -> Result<models::Certificate, ApiError> {
-        let operation_path = format!(
-            "/v1/nodes/{node_id}/certificate",
-            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/nodes/{node_id}/certificate",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -4643,14 +4388,10 @@ impl NodeApi for Client {
         &self,
         param_node_id: uuid::Uuid,
     ) -> Result<models::CertificateDetails, ApiError> {
-        let operation_path = format!(
-            "/v1/nodes/{node_id}/certificate-details",
-            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/nodes/{node_id}/certificate-details",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -4731,12 +4472,7 @@ impl NodeApi for Client {
     }
 
     fn get_nodes_unique_labels(&self) -> Result<models::LabelsCount, ApiError> {
-        let operation_path = format!("/v1/nodes/unique_labels/count");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/nodes/unique_labels/count", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -4818,12 +4554,7 @@ impl NodeApi for Client {
         &self,
         param_body: models::NodeProvisionRequest,
     ) -> Result<models::TaskResult, ApiError> {
-        let operation_path = format!("/v1/nodes");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/nodes", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -4912,14 +4643,10 @@ impl NodeApi for Client {
         param_node_id: uuid::Uuid,
         param_body: models::NodeUpdateRequest,
     ) -> Result<models::Node, ApiError> {
-        let operation_path = format!(
-            "/v1/nodes/{node_id}",
-            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/nodes/{node_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            node_id = utf8_percent_encode(&param_node_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -5008,12 +4735,7 @@ impl NodeApi for Client {
         &self,
         param_body: models::NodeStatusRequest,
     ) -> Result<models::NodeStatusResponse, ApiError> {
-        let operation_path = format!("/v1/node/status");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/node/status", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -5106,12 +4828,7 @@ impl RegistryApi for Client {
         &self,
         param_registry_request: models::RegistryRequest,
     ) -> Result<models::Registry, ApiError> {
-        let operation_path = format!("/v1/registry");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/registry", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -5197,14 +4914,10 @@ impl RegistryApi for Client {
     }
 
     fn delete_registry(&self, param_registry_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/registry/{registry_id}",
-            registry_id = utf8_percent_encode(&param_registry_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/registry/{registry_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            registry_id = utf8_percent_encode(&param_registry_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -5276,12 +4989,7 @@ impl RegistryApi for Client {
     }
 
     fn get_all_registries(&self) -> Result<Vec<models::Registry>, ApiError> {
-        let operation_path = format!("/v1/registry");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/registry", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -5361,14 +5069,10 @@ impl RegistryApi for Client {
     }
 
     fn get_registry(&self, param_registry_id: uuid::Uuid) -> Result<models::Registry, ApiError> {
-        let operation_path = format!(
-            "/v1/registry/{registry_id}",
-            registry_id = utf8_percent_encode(&param_registry_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/registry/{registry_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            registry_id = utf8_percent_encode(&param_registry_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -5451,14 +5155,10 @@ impl RegistryApi for Client {
         &self,
         param_app_id: uuid::Uuid,
     ) -> Result<models::AppRegistryResponse, ApiError> {
-        let operation_path = format!(
-            "/v1/registry/app/{app_id}",
-            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/registry/app/{app_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            app_id = utf8_percent_encode(&param_app_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -5542,12 +5242,7 @@ impl RegistryApi for Client {
         &self,
         param_image_name: String,
     ) -> Result<models::ImageRegistryResponse, ApiError> {
-        let operation_path = format!("/v1/image/registry");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/image/registry", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
         query_string.append_pair("image_name", &param_image_name.to_string());
@@ -5632,14 +5327,10 @@ impl RegistryApi for Client {
         param_registry_id: uuid::Uuid,
         param_body: models::UpdateRegistryRequest,
     ) -> Result<models::Registry, ApiError> {
-        let operation_path = format!(
-            "/v1/registry/{registry_id}",
-            registry_id = utf8_percent_encode(&param_registry_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/registry/{registry_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            registry_id = utf8_percent_encode(&param_registry_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -5729,12 +5420,7 @@ impl SystemApi for Client {
     type Error = ApiError;
 
     fn get_manager_version(&self) -> Result<models::VersionResponse, ApiError> {
-        let operation_path = format!("/v1/sys/version");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/sys/version", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -5829,12 +5515,7 @@ impl TaskApi for Client {
         param_sort_by: Option<String>,
         param_base_filters: Option<String>,
     ) -> Result<models::GetAllTasksResponse, ApiError> {
-        let operation_path = format!("/v1/tasks");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/tasks", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -5941,14 +5622,10 @@ impl TaskApi for Client {
     }
 
     fn get_task(&self, param_task_id: uuid::Uuid) -> Result<models::Task, ApiError> {
-        let operation_path = format!(
-            "/v1/tasks/{task_id}",
-            task_id = utf8_percent_encode(&param_task_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/tasks/{task_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            task_id = utf8_percent_encode(&param_task_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -6028,14 +5705,10 @@ impl TaskApi for Client {
     }
 
     fn get_task_status(&self, param_task_id: uuid::Uuid) -> Result<models::TaskResult, ApiError> {
-        let operation_path = format!(
-            "/v1/tasks/status/{task_id}",
-            task_id = utf8_percent_encode(&param_task_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/tasks/status/{task_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            task_id = utf8_percent_encode(&param_task_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -6119,14 +5792,10 @@ impl TaskApi for Client {
         param_task_id: uuid::Uuid,
         param_body: models::TaskUpdateRequest,
     ) -> Result<models::TaskResult, ApiError> {
-        let operation_path = format!(
-            "/v1/tasks/{task_id}",
-            task_id = utf8_percent_encode(&param_task_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/tasks/{task_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            task_id = utf8_percent_encode(&param_task_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -6219,12 +5888,7 @@ impl ToolsApi for Client {
         &self,
         param_body: models::ConversionRequest,
     ) -> Result<models::ConversionResponse, ApiError> {
-        let operation_path = format!("/v1/tools/converter/convert-app");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/tools/converter/convert-app", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -6315,12 +5979,7 @@ impl UsersApi for Client {
     type Error = ApiError;
 
     fn accept_terms_and_conditions(&self) -> Result<(), ApiError> {
-        let operation_path = format!("/v1/users/terms_and_conditions");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users/terms_and_conditions", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -6391,12 +6050,7 @@ impl UsersApi for Client {
     }
 
     fn change_password(&self, param_body: models::PasswordChangeRequest) -> Result<(), ApiError> {
-        let operation_path = format!("/v1/users/change_password");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users/change_password", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -6476,12 +6130,7 @@ impl UsersApi for Client {
         &self,
         param_body: models::ConfirmEmailRequest,
     ) -> Result<models::ConfirmEmailResponse, ApiError> {
-        let operation_path = format!("/v1/users/confirm_email");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users/confirm_email", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -6567,12 +6216,7 @@ impl UsersApi for Client {
     }
 
     fn create_user(&self, param_body: models::SignupRequest) -> Result<models::User, ApiError> {
-        let operation_path = format!("/v1/users");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -6657,15 +6301,12 @@ impl UsersApi for Client {
     }
 
     fn delete_user_account(&self, param_user_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/users/{user_id}",
+        let mut url = format!(
+            "{}/v1/users/{user_id}",
+            self.base_path,
             user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
         );
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
         let query_string_str = query_string.finish();
@@ -6735,14 +6376,10 @@ impl UsersApi for Client {
     }
 
     fn delete_user_from_account(&self, param_user_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/users/{user_id}/accounts",
-            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/users/{user_id}/accounts",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -6814,12 +6451,7 @@ impl UsersApi for Client {
     }
 
     fn forgot_password(&self, param_body: models::ForgotPasswordRequest) -> Result<(), ApiError> {
-        let operation_path = format!("/v1/users/forgot_password");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users/forgot_password", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -6902,12 +6534,7 @@ impl UsersApi for Client {
         param_offset: Option<i32>,
         param_sort_by: Option<String>,
     ) -> Result<models::GetAllUsersResponse, ApiError> {
-        let operation_path = format!("/v1/users");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -6999,12 +6626,7 @@ impl UsersApi for Client {
     }
 
     fn get_logged_in_user(&self) -> Result<models::User, ApiError> {
-        let operation_path = format!("/v1/user");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/user", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -7083,14 +6705,10 @@ impl UsersApi for Client {
     }
 
     fn get_user(&self, param_user_id: uuid::Uuid) -> Result<models::User, ApiError> {
-        let operation_path = format!(
-            "/v1/users/{user_id}",
-            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/users/{user_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -7170,12 +6788,7 @@ impl UsersApi for Client {
     }
 
     fn invite_user(&self, param_body: models::InviteUserRequest) -> Result<models::User, ApiError> {
-        let operation_path = format!("/v1/users/invite");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users/invite", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -7263,12 +6876,7 @@ impl UsersApi for Client {
         &self,
         param_body: models::ProcessInviteRequest,
     ) -> Result<(), ApiError> {
-        let operation_path = format!("/v1/users/process_invite");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users/process_invite", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -7347,12 +6955,7 @@ impl UsersApi for Client {
     }
 
     fn resend_confirm_email(&self) -> Result<(), ApiError> {
-        let operation_path = format!("/v1/users/resend_confirm_email");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/users/resend_confirm_email", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -7423,14 +7026,10 @@ impl UsersApi for Client {
     }
 
     fn resend_invitation(&self, param_user_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/users/{user_id}/resend_invite",
-            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/users/{user_id}/resend_invite",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -7506,14 +7105,10 @@ impl UsersApi for Client {
         param_user_id: uuid::Uuid,
         param_body: models::PasswordResetRequest,
     ) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/users/{user_id}/reset_password",
-            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/users/{user_id}/reset_password",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -7595,14 +7190,10 @@ impl UsersApi for Client {
         param_user_id: uuid::Uuid,
         param_body: models::UpdateUserRequest,
     ) -> Result<models::User, ApiError> {
-        let operation_path = format!(
-            "/v1/users/{user_id}",
-            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/users/{user_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -7692,14 +7283,10 @@ impl UsersApi for Client {
         param_user_id: uuid::Uuid,
         param_body: models::ValidateTokenRequest,
     ) -> Result<models::ValidateTokenResponse, ApiError> {
-        let operation_path = format!(
-            "/v1/users/{user_id}/validate_token",
-            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/users/{user_id}/validate_token",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            user_id = utf8_percent_encode(&param_user_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -7795,12 +7382,7 @@ impl WorkflowApi for Client {
         &self,
         param_body: models::CreateWorkflowGraph,
     ) -> Result<models::WorkflowGraph, ApiError> {
-        let operation_path = format!("/v1/workflows/draft/graphs");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/workflows/draft/graphs", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -7889,14 +7471,10 @@ impl WorkflowApi for Client {
     }
 
     fn delete_workflow_graph(&self, param_graph_id: uuid::Uuid) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/workflows/draft/graphs/{graph_id}",
-            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/workflows/draft/graphs/{graph_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -7977,12 +7555,7 @@ impl WorkflowApi for Client {
         param_limit: Option<i32>,
         param_offset: Option<i32>,
     ) -> Result<models::GetAllWorkflowGraphsResponse, ApiError> {
-        let operation_path = format!("/v1/workflows/draft/graphs");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/workflows/draft/graphs", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -8086,14 +7659,10 @@ impl WorkflowApi for Client {
         &self,
         param_graph_id: uuid::Uuid,
     ) -> Result<models::WorkflowGraph, ApiError> {
-        let operation_path = format!(
-            "/v1/workflows/draft/graphs/{graph_id}",
-            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/workflows/draft/graphs/{graph_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8178,14 +7747,10 @@ impl WorkflowApi for Client {
         param_graph_id: uuid::Uuid,
         param_body: models::UpdateWorkflowGraph,
     ) -> Result<models::WorkflowGraph, ApiError> {
-        let operation_path = format!(
-            "/v1/workflows/draft/graphs/{graph_id}",
-            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/workflows/draft/graphs/{graph_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8281,12 +7846,7 @@ impl WorkflowFinalApi for Client {
         &self,
         param_body: models::CreateFinalWorkflowGraph,
     ) -> Result<models::FinalWorkflow, ApiError> {
-        let operation_path = format!("/v1/workflows/final/graphs");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/workflows/final/graphs", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -8379,15 +7939,11 @@ impl WorkflowFinalApi for Client {
         param_graph_id: uuid::Uuid,
         param_version: String,
     ) -> Result<(), ApiError> {
-        let operation_path = format!(
-            "/v1/workflows/final/graphs/{graph_id}/{version}",
+        let mut url = format!(
+            "{}/v1/workflows/final/graphs/{graph_id}/{version}",
+            self.base_path,
             graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET),
             version = utf8_percent_encode(&param_version.to_string(), ID_ENCODE_SET)
-        );
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8467,12 +8023,7 @@ impl WorkflowFinalApi for Client {
         param_limit: Option<i32>,
         param_offset: Option<i32>,
     ) -> Result<models::GetAllFinalWorkflowGraphsResponse, ApiError> {
-        let operation_path = format!("/v1/workflows/final/graphs");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/workflows/final/graphs", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -8574,15 +8125,11 @@ impl WorkflowFinalApi for Client {
         param_graph_id: uuid::Uuid,
         param_version: String,
     ) -> Result<models::VersionInFinalWorkflow, ApiError> {
-        let operation_path = format!(
-            "/v1/workflows/final/graphs/{graph_id}/{version}",
+        let mut url = format!(
+            "{}/v1/workflows/final/graphs/{graph_id}/{version}",
+            self.base_path,
             graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET),
             version = utf8_percent_encode(&param_version.to_string(), ID_ENCODE_SET)
-        );
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8666,14 +8213,10 @@ impl WorkflowFinalApi for Client {
         &self,
         param_graph_id: uuid::Uuid,
     ) -> Result<models::FinalWorkflow, ApiError> {
-        let operation_path = format!(
-            "/v1/workflows/final/graphs/{graph_id}",
-            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/workflows/final/graphs/{graph_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8758,14 +8301,10 @@ impl WorkflowFinalApi for Client {
         param_graph_id: uuid::Uuid,
         param_body: models::CreateWorkflowVersionRequest,
     ) -> Result<models::VersionInFinalWorkflow, ApiError> {
-        let operation_path = format!(
-            "/v1/workflows/final/graphs/{graph_id}",
-            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/workflows/final/graphs/{graph_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            graph_id = utf8_percent_encode(&param_graph_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8858,14 +8397,10 @@ impl ZoneApi for Client {
     type Error = ApiError;
 
     fn get_zone(&self, param_zone_id: uuid::Uuid) -> Result<models::Zone, ApiError> {
-        let operation_path = format!(
-            "/v1/zones/{zone_id}",
-            zone_id = utf8_percent_encode(&param_zone_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/zones/{zone_id}",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            zone_id = utf8_percent_encode(&param_zone_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -8948,14 +8483,10 @@ impl ZoneApi for Client {
         &self,
         param_zone_id: uuid::Uuid,
     ) -> Result<models::ZoneJoinToken, ApiError> {
-        let operation_path = format!(
-            "/v1/zones/{zone_id}/token",
-            zone_id = utf8_percent_encode(&param_zone_id.to_string(), ID_ENCODE_SET)
-        );
         let mut url = format!(
-            "{}{}",
+            "{}/v1/zones/{zone_id}/token",
             self.base_path,
-            self.remap_operation_path(operation_path)
+            zone_id = utf8_percent_encode(&param_zone_id.to_string(), ID_ENCODE_SET)
         );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
@@ -9036,12 +8567,7 @@ impl ZoneApi for Client {
     }
 
     fn get_zones(&self) -> Result<Vec<models::Zone>, ApiError> {
-        let operation_path = format!("/v1/zones");
-        let mut url = format!(
-            "{}{}",
-            self.base_path,
-            self.remap_operation_path(operation_path)
-        );
+        let mut url = format!("{}/v1/zones", self.base_path);
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -9199,7 +8725,7 @@ fn compute_sha256(input: &[u8]) -> Result<[u8; SHA256_BYTE_LENGTH], ApiError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AccountsApi, AppApi, Client, Sha256Hash, SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH};
+    use crate::{Sha256Hash, SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH};
     use client::deserialize_config_checked;
     use std::convert::{From, TryFrom};
 
@@ -9251,66 +8777,5 @@ mod tests {
         let result = deserialize_config_checked(json_data, &expected_hash.0);
 
         assert!(result.is_ok())
-    }
-
-    #[test]
-    fn test_remap_operation_path() {
-        let mut client = Client::try_new_http("http://example.com:1234").unwrap();
-        assert_eq!(
-            client.remap_operation_path("/v1/test/path/no_remap".to_owned()),
-            "/v1/test/path/no_remap"
-        );
-        assert_eq!(
-            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/no_remap".to_owned()),
-            "/v1/test/654389468329ferugfirwvbyr/no_remap"
-        );
-        client.set_use_new_paths(true);
-        assert_eq!(
-            client.remap_operation_path("/v1/something/path/remap".to_owned()),
-            "/api/v1/confidential_computing/something/path/remap"
-        );
-        assert_eq!(
-            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/remap".to_owned()),
-            "/api/v1/confidential_computing/test/654389468329ferugfirwvbyr/remap"
-        );
-        assert_eq!(
-            client.remap_operation_path("/v1/accounts/path/no_remap".to_owned()),
-            "/v1/accounts/path/no_remap"
-        );
-        assert_eq!(
-            client.remap_operation_path("/v1/user/654389468329ferugfirwvbyr/no_remap".to_owned()),
-            "/v1/user/654389468329ferugfirwvbyr/no_remap"
-        );
-    }
-
-    #[test]
-    fn test_mock_use_new_paths() {
-        // Request a new server from the pool
-        let mut server = mockito::Server::new();
-
-        let url = server.url();
-        let mut client = Client::try_new_http(&url).unwrap();
-        // check that the old path is used before remap is enabled
-        let mock_remap_path = server
-            .mock("GET", "/v1/apps/unique_labels/count")
-            .with_status(201)
-            .create();
-        let _ = client.get_apps_unique_labels();
-        mock_remap_path.assert();
-        client.set_use_new_paths(true);
-        // check that the remap doesn't affect certain endpoints
-        let mock_no_remap_path = server.mock("GET", "/v1/accounts").with_status(200).create();
-        let _ = client.get_accounts();
-        mock_no_remap_path.assert();
-        // check that the new path is used after remap is enabled
-        let mock_remap_path = server
-            .mock(
-                "GET",
-                "/api/v1/confidential_computing/apps/unique_labels/count",
-            )
-            .with_status(201)
-            .create();
-        let _ = client.get_apps_unique_labels();
-        mock_remap_path.assert();
     }
 }
