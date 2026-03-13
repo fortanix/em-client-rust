@@ -80,6 +80,7 @@ pub struct Client {
     hyper_client: Arc<hyper::client::Client>,
     base_path: String,
     headers: Headers,
+    use_new_paths: bool,
 }
 
 impl fmt::Debug for Client {
@@ -94,6 +95,7 @@ impl Clone for Client {
             hyper_client: self.hyper_client.clone(),
             base_path: self.base_path.clone(),
             headers: self.headers.clone(),
+            use_new_paths: self.use_new_paths,
         }
     }
 }
@@ -137,6 +139,7 @@ impl Client {
             hyper_client: Arc::new(hyper_client),
             base_path: into_base_path(base_path, protocol)?,
             headers: Headers::new(),
+            use_new_paths: false,
         })
     }
 
@@ -161,11 +164,40 @@ impl Client {
             hyper_client: hyper_client,
             base_path: into_base_path(base_path, None)?,
             headers: Headers::new(),
+            use_new_paths: false,
         })
     }
 
     pub fn headers(&mut self) -> &mut Headers {
         &mut self.headers
+    }
+
+    pub fn uses_new_paths(&self) -> bool {
+        self.use_new_paths
+    }
+
+    pub fn set_use_new_paths(&mut self, use_new_paths: bool) {
+        self.use_new_paths = use_new_paths;
+    }
+
+    pub fn with_new_paths(self) -> Self {
+        Self {
+            use_new_paths: true,
+            ..self
+        }
+    }
+
+    fn remap_operation_path<'a>(&self, operation: &'a str) -> Cow<'a, str> {
+        if !self.use_new_paths {
+            return Cow::Borrowed(operation);
+        }
+        if let Some(path_without_v1) = operation.strip_prefix("/v1/") {
+            return Cow::Owned(format!(
+                "/api/v1/confidential_computing/{}",
+                path_without_v1
+            ));
+        }
+        return Cow::Borrowed(operation);
     }
 }
 
@@ -1734,7 +1766,12 @@ impl ApplicationConfigApi for Client {
         &self,
         expected_hash: &[u8; 32],
     ) -> Result<models::RuntimeAppConfig, ApiError> {
-        let mut url = format!("{}/v1/runtime/app_configs", self.base_path);
+        let mut operation_path = "/v1/runtime/app_configs";
+        let mut url = format!(
+            "{}{}",
+            self.base_path,
+            self.remap_operation_path(operation_path)
+        );
 
         let mut query_string = self::url::form_urlencoded::Serializer::new("".to_owned());
 
@@ -8725,7 +8762,7 @@ fn compute_sha256(input: &[u8]) -> Result<[u8; SHA256_BYTE_LENGTH], ApiError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Sha256Hash, SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH};
+    use crate::{ApplicationConfigApi, Client, Sha256Hash, SHA256_BYTE_LENGTH, SHA256_CHAR_LENGTH};
     use client::deserialize_config_checked;
     use std::convert::{From, TryFrom};
 
@@ -8777,5 +8814,57 @@ mod tests {
         let result = deserialize_config_checked(json_data, &expected_hash.0);
 
         assert!(result.is_ok())
+    }
+
+    #[test]
+    fn test_remap_operation_path() {
+        let mut client = Client::try_new_http("http://example.com:1234").unwrap();
+        assert_eq!(
+            client.remap_operation_path("/v1/test/path/no_remap"),
+            "/v1/test/path/no_remap"
+        );
+        assert_eq!(
+            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/no_remap"),
+            "/v1/test/654389468329ferugfirwvbyr/no_remap"
+        );
+        client.set_use_new_paths(true);
+        assert_eq!(
+            client.remap_operation_path("/v1/something/path/remap"),
+            "/api/v1/confidential_computing/something/path/remap"
+        );
+        assert_eq!(
+            client.remap_operation_path("/v1/test/654389468329ferugfirwvbyr/remap"),
+            "/api/v1/confidential_computing/test/654389468329ferugfirwvbyr/remap"
+        );
+    }
+
+    #[test]
+    fn test_mock_use_new_paths() {
+        // Request a new server from the pool
+        let mut server = mockito::Server::new();
+        let expected_hash = Sha256Hash::try_from(
+            "43fd2e42e40365622fa81d3a3037b6ae130b552dc5f026d8c4168f89c7ff20c8",
+        )
+        .unwrap();
+
+        let url = server.url();
+        let mut client = Client::try_new_http(&url).unwrap();
+        // check that the old path is used before remap is enabled
+        let mock_remap_path = server
+            .mock("GET", "/v1/runtime/app_configs")
+            .with_status(201)
+            .create();
+        let _ = client.get_runtime_application_config(&expected_hash);
+        mock_remap_path.assert();
+
+        client.set_use_new_paths(true);
+        // check that the new path is used after remap is enabled
+        let mock_remap_path = server
+            .mock("GET", "/api/v1/confidential_computing/runtime/app_configs")
+            .with_status(201)
+            .create();
+
+        let _ = client.get_runtime_application_config(&expected_hash);
+        mock_remap_path.assert();
     }
 }
