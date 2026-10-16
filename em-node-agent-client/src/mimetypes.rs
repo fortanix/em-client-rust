@@ -6,7 +6,7 @@
 /// mime types for requests and responses
 
 pub mod responses {
-    use hyper::mime::*;
+    use mime::*;
 
     // The macro is called per-operation to beat the recursion limit
 
@@ -42,7 +42,7 @@ pub mod responses {
 }
 
 pub mod requests {
-    use hyper::mime::*;
+    use mime::*;
 
     lazy_static! {
         /// Create Mime objects for the request content types for AppHeartbeat

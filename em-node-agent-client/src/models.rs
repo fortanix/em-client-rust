@@ -8,7 +8,7 @@ extern crate chrono;
 
 use serde::ser::Serializer;
 
-use models;
+use crate::models;
 use std::collections::HashMap;
 use std::string::ParseError;
 use uuid;
