@@ -14,7 +14,6 @@ use std::string::ParseError;
 use uuid;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct AgentManagerAuthRequest {
     /// Node IP
     #[serde(rename = "node_ip")]
@@ -37,7 +36,6 @@ impl AgentManagerAuthRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct AgentManagerAuthResponse {
     /// Access token for node
     #[serde(rename = "access_token")]
@@ -52,7 +50,6 @@ impl AgentManagerAuthResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct AppHeartbeatRequest {
     /// Application Heartbeat csr
     #[serde(rename = "csr")]
@@ -76,7 +73,6 @@ impl AppHeartbeatRequest {
 
 /// App Heartbeat Response
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct AppHeartbeatResponse {
     #[serde(rename = "status")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,7 +86,6 @@ impl AppHeartbeatResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct GetFortanixAttestationRequest {
     /// Enclave Report bytes
     #[serde(rename = "report")]
@@ -113,7 +108,6 @@ impl GetFortanixAttestationRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct GetFortanixAttestationResponse {
     /// Verified attestation certificate
     #[serde(rename = "attestation_certificate")]
@@ -142,7 +136,6 @@ impl GetFortanixAttestationResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct IssueCertificateRequest {
     /// Application CSR
     #[serde(rename = "csr")]
@@ -157,7 +150,6 @@ impl IssueCertificateRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct IssueCertificateResponse {
     /// Task Id
     #[serde(rename = "task_id")]
@@ -186,7 +178,6 @@ impl IssueCertificateResponse {
 
 /// Node local data
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct NodeLocalData {
     /// Node id
     #[serde(rename = "node_id")]
@@ -243,7 +234,6 @@ impl ::std::str::FromStr for ResponseStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct TargetInfo {
     /// Enclave Target Info
     #[serde(rename = "targetInfo")]
@@ -305,7 +295,6 @@ impl ::std::str::FromStr for TaskStatusType {
 
 /// Agent Version
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub struct VersionResponse {
     /// Agent Version
     #[serde(rename = "version")]
