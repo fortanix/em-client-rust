@@ -32,7 +32,3 @@ headers = {version = "0.4", optional = true}
 [dev-dependencies]
 clap = "2.25"
 error-chain = "0.12"
-hyper = {version = "1.10", default-features = false, features = ["server", "http1"]}
-hyper-util = {version = "0.1", features = ["tokio"]}
-http-body-util = "0.1"
-tokio = {version = "1", features = ["rt", "net", "time"]}
