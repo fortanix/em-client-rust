@@ -389,7 +389,6 @@ pub mod base64_format {
 }
 pub use self::base64_format::ByteArray;
 
-
 /// Very simple error type - just holds a description of the error. This is useful for human
 /// diagnosis and troubleshooting, but not for applications to parse. The justification for this
 /// is to deny applications visibility into the communication layer, forcing the application code
@@ -405,7 +404,7 @@ pub struct ApiError {
 pub enum ApiErrorDetails {
     Message(String),
     ServerResponse(ServerErrorResponse),
-    ClientError(simple_hyper_client::Error)
+    ClientError(simple_hyper_client::Error),
 }
 
 impl From<simple_hyper_client::Error> for ApiError {
@@ -426,14 +425,24 @@ pub struct ServerErrorResponse {
 impl fmt::Debug for ServerErrorResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ServerErrorResponse")
-         .field("status_code", &self.status_code)
-         .field("response_body", &self.response_body.as_ref().map(|body| std::str::from_utf8(body)))
-         .finish()
+            .field("status_code", &self.status_code)
+            .field(
+                "response_body",
+                &self
+                    .response_body
+                    .as_ref()
+                    .map(|body| std::str::from_utf8(body)),
+            )
+            .finish()
     }
 }
 
 impl ServerErrorResponse {
-    pub fn new(status_code: u16, response_body: Option<Vec<u8>>, response_headers: HeaderMap) ->  ServerErrorResponse {
+    pub fn new(
+        status_code: u16,
+        response_body: Option<Vec<u8>>,
+        response_headers: HeaderMap,
+    ) -> ServerErrorResponse {
         ServerErrorResponse {
             status_code,
             response_body,
@@ -470,7 +479,7 @@ impl ApiError {
     pub fn new(error_type: SimpleErrorType, details: ApiErrorDetails) -> ApiError {
         ApiError {
             error_type,
-            details
+            details,
         }
     }
 }
@@ -479,7 +488,11 @@ impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.details {
             ApiErrorDetails::Message(msg) => msg.fmt(f),
-            ApiErrorDetails::ServerResponse(ServerErrorResponse { status_code, response_body, .. }) => {
+            ApiErrorDetails::ServerResponse(ServerErrorResponse {
+                status_code,
+                response_body,
+                ..
+            }) => {
                 write!(f, "Unexpected response code {}", status_code)?;
                 if let Some(body) = response_body.as_ref() {
                     f.write_str(":\n")?;
@@ -492,7 +505,7 @@ impl fmt::Display for ApiError {
             }
             ApiErrorDetails::ClientError(inner) => {
                 write!(f, "Client error: {inner}")
-            },
+            }
         }
     }
 }
@@ -505,7 +518,10 @@ impl error::Error for ApiError {
 
 impl<'a> From<&'a str> for ApiError {
     fn from(e: &str) -> Self {
-        ApiError::new(SimpleErrorType::Temporary, ApiErrorDetails::Message(e.to_string()))
+        ApiError::new(
+            SimpleErrorType::Temporary,
+            ApiErrorDetails::Message(e.to_string()),
+        )
     }
 }
 
@@ -517,7 +533,10 @@ impl From<String> for ApiError {
 
 impl From<serde_json::Error> for ApiError {
     fn from(e: serde_json::Error) -> Self {
-        ApiError::new(SimpleErrorType::Temporary, ApiErrorDetails::Message(format!("Response body did not match the schema: {}", e)))
+        ApiError::new(
+            SimpleErrorType::Temporary,
+            ApiErrorDetails::Message(format!("Response body did not match the schema: {}", e)),
+        )
     }
 }
 

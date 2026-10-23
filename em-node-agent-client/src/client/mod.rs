@@ -10,7 +10,10 @@ extern crate url;
 extern crate uuid;
 
 use self::url::percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET};
-use crate::{ApiError, ApiErrorDetails, CertificateApi, EnclaveApi, ServerErrorResponse, SimpleErrorType, SystemApi, mimetypes, models};
+use crate::{
+    mimetypes, models, ApiError, ApiErrorDetails, CertificateApi, EnclaveApi, ServerErrorResponse,
+    SimpleErrorType, SystemApi,
+};
 use async_trait::async_trait;
 use headers::ContentType;
 use hyper::{HeaderMap, Method};
