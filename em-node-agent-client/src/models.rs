@@ -14,7 +14,7 @@ use std::string::ParseError;
 use uuid;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct AgentManagerAuthRequest {
     /// Node IP
     #[serde(rename = "node_ip")]
@@ -37,7 +37,7 @@ impl AgentManagerAuthRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct AgentManagerAuthResponse {
     /// Access token for node
     #[serde(rename = "access_token")]
@@ -52,7 +52,7 @@ impl AgentManagerAuthResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct AppHeartbeatRequest {
     /// Application Heartbeat csr
     #[serde(rename = "csr")]
@@ -76,7 +76,7 @@ impl AppHeartbeatRequest {
 
 /// App Heartbeat Response
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct AppHeartbeatResponse {
     #[serde(rename = "status")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,7 +90,7 @@ impl AppHeartbeatResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct GetFortanixAttestationRequest {
     /// Enclave Report bytes
     #[serde(rename = "report")]
@@ -113,7 +113,7 @@ impl GetFortanixAttestationRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct GetFortanixAttestationResponse {
     /// Verified attestation certificate
     #[serde(rename = "attestation_certificate")]
@@ -142,7 +142,7 @@ impl GetFortanixAttestationResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct IssueCertificateRequest {
     /// Application CSR
     #[serde(rename = "csr")]
@@ -157,7 +157,7 @@ impl IssueCertificateRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct IssueCertificateResponse {
     /// Task Id
     #[serde(rename = "task_id")]
@@ -186,7 +186,7 @@ impl IssueCertificateResponse {
 
 /// Node local data
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct NodeLocalData {
     /// Node id
     #[serde(rename = "node_id")]
@@ -215,7 +215,6 @@ impl NodeLocalData {
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
 pub enum ResponseStatus {
     #[serde(rename = "OK")]
     OK,
@@ -244,7 +243,7 @@ impl ::std::str::FromStr for ResponseStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct TargetInfo {
     /// Enclave Target Info
     #[serde(rename = "targetInfo")]
@@ -265,7 +264,6 @@ impl TargetInfo {
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGenericEnum))]
 pub enum TaskStatusType {
     #[serde(rename = "INPROGRESS")]
     INPROGRESS,
@@ -307,7 +305,7 @@ impl ::std::str::FromStr for TaskStatusType {
 
 /// Agent Version
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "conversion", derive(LabelledGeneric))]
+
 pub struct VersionResponse {
     /// Agent Version
     #[serde(rename = "version")]
