@@ -1,7 +1,7 @@
 [package]
 name = "em-node-agent-client"
 version = "2.0.0"
-edition = "2018"
+edition = "2021"
 authors = ["Fortanix Inc."]
 license = "MPL-2.0"
 description = "This crate provides rust bindings for Node Agent API."
