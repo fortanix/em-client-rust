@@ -22,16 +22,12 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
-#[cfg(any(feature = "client"))]
 #[macro_use]
 extern crate hyper;
-#[cfg(any(feature = "client"))]
 #[macro_use]
 extern crate url;
 
-#[cfg(feature = "client")]
 extern crate headers;
-#[cfg(feature = "client")]
 extern crate simple_hyper_client;
 
 extern crate mime;
@@ -44,7 +40,7 @@ extern crate uuid;
 
 use async_trait::async_trait;
 use futures::Stream;
-use hyper::HeaderMap;
+use headers::HeaderMap;
 use std::error;
 use std::fmt;
 use std::io::Error;
@@ -52,7 +48,6 @@ use std::io::Error;
 #[allow(unused_imports)]
 use std::collections::HashMap;
 
-#[cfg(feature = "client")]
 mod mimetypes;
 
 #[deprecated(note = "Import futures directly")]
@@ -325,11 +320,9 @@ where
     }
 }
 
-#[cfg(feature = "client")]
 pub mod client;
 
 // Re-export Client as a top-level name
-#[cfg(feature = "client")]
 pub use self::client::Client;
 
 pub mod models;
@@ -337,7 +330,7 @@ pub mod models;
 pub mod base64_format {
     // This module from swagger-rs
 
-    use base64::{decode, encode};
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
     use serde::de::{Deserialize, Deserializer, Error};
     use serde::ser::{Serialize, Serializer};
     use std::ops::{Deref, DerefMut};
@@ -351,7 +344,7 @@ pub mod base64_format {
         where
             S: Serializer,
         {
-            serializer.serialize_str(&encode(&self.0))
+            serializer.serialize_str(&STANDARD.encode(&self.0))
         }
     }
 
@@ -361,7 +354,7 @@ pub mod base64_format {
             D: Deserializer<'de>,
         {
             let s = String::deserialize(deserializer)?;
-            match decode(&s) {
+            match STANDARD.decode(&s) {
                 Ok(bin) => Ok(ByteArray(bin)),
                 _ => Err(D::Error::custom("invalid base64")),
             }

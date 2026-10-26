@@ -54,7 +54,7 @@ jobs:
         run: cargo test --locked --all-features --workspace
 
       - name: cargo test (debug; no default features)
-        run: cargo test --locked --features client --workspace
+        run: cargo test --locked --no-default-features --workspace
 
   semver:
     name: Check semver compatibility

@@ -56,6 +56,7 @@ fn into_base_path(
 }
 
 /// A client that implements the API by making HTTP calls out to a server.
+#[derive(Clone)]
 pub struct Client {
     hyper_client: Arc<HttpClient>,
     base_path: String,
@@ -64,17 +65,11 @@ pub struct Client {
 
 impl fmt::Debug for Client {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Client {{ base_path: {} }}", self.base_path)
-    }
-}
-
-impl Clone for Client {
-    fn clone(&self) -> Self {
-        Client {
-            hyper_client: self.hyper_client.clone(),
-            base_path: self.base_path.clone(),
-            headers: self.headers.clone(),
-        }
+        write!(
+            f,
+            "Client {{ base_path: {} headers: {:?}}}",
+            self.base_path, self.headers
+        )
     }
 }
 
@@ -164,22 +159,13 @@ impl CertificateApi for Client {
         );
         let mut url = format!("{}{}", self.base_path, operation_path);
 
-        let query_string_str = {
-            let mut query_string = url::form_urlencoded::Serializer::new("".to_owned());
-            query_string.finish()
-        };
-        if !query_string_str.is_empty() {
-            url += "?";
-            url += &query_string_str;
-        }
-
         let mut request = self.hyper_client.request(Method::POST, url)?;
         request = request.headers(self.headers.clone());
 
         let mut response = request.send().await.map_err(|e| {
             ApiError::new(
                 SimpleErrorType::Permanent,
-                ApiErrorDetails::Message(format!("No response received: {}", e)),
+                ApiErrorDetails::Message(format!("Failed to send request : {}", e)),
             )
         })?;
         match response.status().as_u16() {
@@ -232,15 +218,6 @@ impl CertificateApi for Client {
         let operation_path = format!("/v1/certificate/issue");
         let mut url = format!("{}{}", self.base_path, operation_path);
 
-        let query_string_str = {
-            let mut query_string = url::form_urlencoded::Serializer::new("".to_owned());
-            query_string.finish()
-        };
-        if !query_string_str.is_empty() {
-            url += "?";
-            url += &query_string_str;
-        }
-
         let mut request = self.hyper_client.request(Method::POST, url)?;
         request = request.headers(self.headers.clone());
         let body = serde_json::to_string(&param_body)
@@ -255,7 +232,7 @@ impl CertificateApi for Client {
         let mut response = request.send().await.map_err(|e| {
             ApiError::new(
                 SimpleErrorType::Permanent,
-                ApiErrorDetails::Message(format!("No response received: {}", e)),
+                ApiErrorDetails::Message(format!("Failed to send request : {}", e)),
             )
         })?;
         match response.status().as_u16() {
@@ -313,15 +290,6 @@ impl EnclaveApi for Client {
         let operation_path = format!("/v1/enclave/attest");
         let mut url = format!("{}{}", self.base_path, operation_path);
 
-        let query_string_str = {
-            let mut query_string = url::form_urlencoded::Serializer::new("".to_owned());
-            query_string.finish()
-        };
-        if !query_string_str.is_empty() {
-            url += "?";
-            url += &query_string_str;
-        }
-
         let mut request = self.hyper_client.request(Method::POST, url)?;
         request = request.headers(self.headers.clone());
         // Body parameter
@@ -337,7 +305,7 @@ impl EnclaveApi for Client {
         let mut response = request.send().await.map_err(|e| {
             ApiError::new(
                 SimpleErrorType::Permanent,
-                ApiErrorDetails::Message(format!("No response received: {}", e)),
+                ApiErrorDetails::Message(format!("Failed to send request : {}", e)),
             )
         })?;
         match response.status().as_u16() {
@@ -387,22 +355,13 @@ impl EnclaveApi for Client {
         let operation_path = format!("/v1/enclave/target-info");
         let mut url = format!("{}{}", self.base_path, operation_path);
 
-        let query_string_str = {
-            let mut query_string = url::form_urlencoded::Serializer::new("".to_owned());
-            query_string.finish()
-        };
-        if !query_string_str.is_empty() {
-            url += "?";
-            url += &query_string_str;
-        }
-
         let mut request = self.hyper_client.request(Method::GET, url)?;
         request = request.headers(self.headers.clone());
 
         let mut response = request.send().await.map_err(|e| {
             ApiError::new(
                 SimpleErrorType::Permanent,
-                ApiErrorDetails::Message(format!("No response received: {}", e)),
+                ApiErrorDetails::Message(format!("Failed to send request : {}", e)),
             )
         })?;
         match response.status().as_u16() {
@@ -456,22 +415,13 @@ impl SystemApi for Client {
         let operation_path = format!("/v1/sys/version");
         let mut url = format!("{}{}", self.base_path, operation_path);
 
-        let query_string_str = {
-            let mut query_string = url::form_urlencoded::Serializer::new("".to_owned());
-            query_string.finish()
-        };
-        if !query_string_str.is_empty() {
-            url += "?";
-            url += &query_string_str;
-        }
-
         let mut request = self.hyper_client.request(Method::GET, url)?;
         request = request.headers(self.headers.clone());
 
         let mut response = request.send().await.map_err(|e| {
             ApiError::new(
                 SimpleErrorType::Permanent,
-                ApiErrorDetails::Message(format!("No response received: {}", e)),
+                ApiErrorDetails::Message(format!("Failed to send request : {}", e)),
             )
         })?;
         match response.status().as_u16() {
